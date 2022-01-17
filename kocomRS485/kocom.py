@@ -62,7 +62,7 @@ class Kocom(rs485):
         self._t1.join()
         self._t2.join()
         if not self.connected:
-            logger.debug('[ERROR] 서버 연결이 끊어져 kocom 클래스를 종료합니다.')
+            logger().debug('[ERROR] 서버 연결이 끊어져 kocom 클래스를 종료합니다.')
             return False
 
     def read(self):
@@ -102,12 +102,12 @@ class Kocom(rs485):
 
         if server['anonymous'] != BooleanStr.TRUE:
             if server['server'] == '' or server['username'] == '' or server['password'] == '':
-                logger.info('{} 설정을 확인하세요. Server[{}] ID[{}] PW[{}] Device[{}]'.format(ConfString.MQTT, server['server'], server['username'], server['password'], name))
+                logger().info('{} 설정을 확인하세요. Server[{}] ID[{}] PW[{}] Device[{}]'.format(ConfString.MQTT, server['server'], server['username'], server['password'], name))
                 return False
             mqtt_client.username_pw_set(username=server['username'], password=server['password'])
-            logger.debug('{} STATUS. Server[{}] ID[{}] PW[{}] Device[{}]'.format(ConfString.MQTT, server['server'], server['username'], server['password'], name))
+            logger().debug('{} STATUS. Server[{}] ID[{}] PW[{}] Device[{}]'.format(ConfString.MQTT, server['server'], server['username'], server['password'], name))
         else:
-            logger.debug('{} STATUS. Server[{}] Device[{}]'.format(ConfString.MQTT, server['server'], name))
+            logger().debug('{} STATUS. Server[{}] Device[{}]'.format(ConfString.MQTT, server['server'], name))
 
         mqtt_client.connect(server['server'], 1883, 60)
         mqtt_client.loop_start()
@@ -119,18 +119,18 @@ class Kocom(rs485):
 
         if 'config' in _topic and _topic[0] == 'rs485' and _topic[1] == 'bridge' and _topic[2] == 'config':
             if _topic[3] == 'log_level':
-                if _payload == "info": logger.setLevel(logging.INFO)
-                if _payload == "debug": logger.setLevel(logging.DEBUG)
-                if _payload == "warn": logger.setLevel(logging.WARN)
-                logger.info('[From HA]Set Loglevel to {}'.format(_payload))
+                if _payload == "info": logger().setLevel(logging.INFO)
+                if _payload == "debug": logger().setLevel(logging.DEBUG)
+                if _payload == "warn": logger().setLevel(logging.WARN)
+                logger().info('[From HA]Set Loglevel to {}'.format(_payload))
                 return
             elif _topic[3] == 'restart':
                 self.homeassistant_device_discovery()
-                logger.info('[From HA]HomeAssistant Restart')
+                logger().info('[From HA]HomeAssistant Restart')
                 return
             elif _topic[3] == 'remove':
                 self.homeassistant_device_discovery(remove=True)
-                logger.info('[From HA]HomeAssistant Remove')
+                logger().info('[From HA]HomeAssistant Remove')
                 return
             elif _topic[3] == 'scan':
                 for d_name in conf().KOCOM_DEVICE.values():
@@ -144,17 +144,17 @@ class Kocom(rs485):
                     elif d_name == Device.LIGHT or d_name == Device.PLUG:
                         for r_name in conf().KOCOM_ROOM.values():
                             self.wp_list[d_name][r_name] = {'scan': {'tick': 0, 'count': 0, 'last': 0}}
-                logger.info('[From HA]HomeAssistant Scan')
+                logger().info('[From HA]HomeAssistant Scan')
                 return
             elif _topic[3] == 'packet':
                 self.packet_parsing(_payload.lower(), name='HA')
             elif _topic[3] == 'check_sum':
                 chksum = self.check_sum(_payload.lower())
-                logger.info('[From HA]{} = {}({})'.format(_payload, chksum[0], chksum[1]))
+                logger().info('[From HA]{} = {}({})'.format(_payload, chksum[0], chksum[1]))
         elif not self.kocom_scan:
             self.parse_message(_topic, _payload)
             return
-        logger.info("Message: {} = {}".format(msg.topic, _payload))
+        logger().info("Message: {} = {}".format(msg.topic, _payload))
 
         if self.ha_registry != False and self.ha_registry == msg.topic and self.kocom_scan:
             self.kocom_scan = False
@@ -178,7 +178,7 @@ class Kocom(rs485):
                 if device == Device.GAS:
                     if payload == OnOff.ON:
                         payload = OnOff.OFF
-                        logger.info('[From HA]Error GAS Cannot Set to ON')
+                        logger().info('[From HA]Error GAS Cannot Set to ON')
                     else:
                         self.wp_list[device][room][sub_device][command] = payload
                         self.wp_list[device][room][sub_device]['last'] = command
@@ -193,9 +193,9 @@ class Kocom(rs485):
                 else:
                     self.wp_list[device][room][sub_device][command] = payload
                     self.wp_list[device][room][sub_device]['last'] = command
-                logger.info('[From HA]{}/{}/{}/{} = {}'.format(device, room, sub_device, command, payload))
+                logger().info('[From HA]{}/{}/{}/{} = {}'.format(device, room, sub_device, command, payload))
             except:
-                logger.info('[From HA]Error {} = {}'.format(topic, payload))
+                logger().info('[From HA]Error {} = {}'.format(topic, payload))
         elif device == HAStrings.CLIMATE:
             device = Device.THERMOSTAT
             room = topic[2]
@@ -213,10 +213,10 @@ class Kocom(rs485):
                     'target_temp': self.wp_list[device][room]['target_temp']['set'],
                     'current_temp': self.wp_list[device][room]['current_temp']['state']
                 }
-                logger.info('[From HA]{}/{}/set = [mode={}, target_temp={}]'.format(device, room, self.wp_list[device][room]['mode']['set'], self.wp_list[device][room]['target_temp']['set']))
+                logger().info('[From HA]{}/{}/set = [mode={}, target_temp={}]'.format(device, room, self.wp_list[device][room]['mode']['set'], self.wp_list[device][room]['target_temp']['set']))
                 self.send_to_homeassistant(device, room, ha_payload)
             except:
-                logger.info('[From HA]Error {} = {}'.format(topic, payload))
+                logger().info('[From HA]Error {} = {}'.format(topic, payload))
         elif device == HAStrings.FAN:
             device = Device.FAN
             room = topic[2]
@@ -233,33 +233,33 @@ class Kocom(rs485):
                     'mode': self.wp_list[device][room]['mode']['set'],
                     'speed': self.wp_list[device][room]['speed']['set']
                 }
-                logger.info('[From HA]{}/{}/set = [mode={}, speed={}]'.format(device, room, self.wp_list[device][room]['mode']['set'], self.wp_list[device][room]['speed']['set']))
+                logger().info('[From HA]{}/{}/set = [mode={}, speed={}]'.format(device, room, self.wp_list[device][room]['mode']['set'], self.wp_list[device][room]['speed']['set']))
                 self.send_to_homeassistant(device, room, ha_payload)
             except:
-                logger.info('[From HA]Error {} = {}'.format(topic, payload))
+                logger().info('[From HA]Error {} = {}'.format(topic, payload))
 
     def on_publish(self, client, obj, mid):
-        logger.info("Publish: {}".format(str(mid)))
+        logger().info("Publish: {}".format(str(mid)))
 
     def on_subscribe(self, client, obj, mid, granted_qos):
-        logger.info("Subscribed: {} {}".format(str(mid),str(granted_qos)))
+        logger().info("Subscribed: {} {}".format(str(mid),str(granted_qos)))
 
     def on_connect(self, client, userdata, flags, rc):
         if int(rc) == 0:
-            logger.info("[MQTT] connected OK")
+            logger().info("[MQTT] connected OK")
             self.homeassistant_device_discovery(initial=True)
         elif int(rc) == 1:
-            logger.info("[MQTT] 1: Connection refused – incorrect protocol version")
+            logger().info("[MQTT] 1: Connection refused – incorrect protocol version")
         elif int(rc) == 2:
-            logger.info("[MQTT] 2: Connection refused – invalid client identifier")
+            logger().info("[MQTT] 2: Connection refused – invalid client identifier")
         elif int(rc) == 3:
-            logger.info("[MQTT] 3: Connection refused – server unavailable")
+            logger().info("[MQTT] 3: Connection refused – server unavailable")
         elif int(rc) == 4:
-            logger.info("[MQTT] 4: Connection refused – bad username or password")
+            logger().info("[MQTT] 4: Connection refused – bad username or password")
         elif int(rc) == 5:
-            logger.info("[MQTT] 5: Connection refused – not authorised")
+            logger().info("[MQTT] 5: Connection refused – not authorised")
         else:
-            logger.info("[MQTT] {} : Connection refused".format(rc))
+            logger().info("[MQTT] {} : Connection refused".format(rc))
 
     def homeassistant_device_discovery(self, initial=False, remove=False):
         subscribe_list = []
@@ -477,26 +477,26 @@ class Kocom(rs485):
         v_value = json.dumps(value)
         if device == Device.LIGHT:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.LIGHT, room), v_value)
-            logger.info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.LIGHT, room, v_value))
+            logger().info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.LIGHT, room, v_value))
         elif device == Device.PLUG:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.SWITCH, room), v_value)
-            logger.info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, v_value))
+            logger().info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, v_value))
         elif device == Device.THERMOSTAT:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.CLIMATE, room), v_value)
-            logger.info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.CLIMATE, room, v_value))
+            logger().info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.CLIMATE, room, v_value))
         elif device == Device.ELEVATOR:
             v_value = json.dumps({device: value})
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.SWITCH, room), v_value)
-            logger.info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, v_value))
+            logger().info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, v_value))
         elif device == Device.GAS:
             v_value = json.dumps({device: value})
             self.d_mqtt.publish("{}/{}/{}_{}/state".format(HAStrings.PREFIX, HAStrings.SENSOR, room, Device.GAS), v_value)
-            logger.info("[To HA]{}/{}/{}_{}/state = {}".format(HAStrings.PREFIX, HAStrings.SENSOR, room, Device.GAS, v_value))
+            logger().info("[To HA]{}/{}/{}_{}/state = {}".format(HAStrings.PREFIX, HAStrings.SENSOR, room, Device.GAS, v_value))
             self.d_mqtt.publish("{}/{}/{}_{}/state".format(HAStrings.PREFIX, HAStrings.SWITCH, room, Device.GAS), v_value)
-            logger.info("[To HA]{}/{}/{}_{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, Device.GAS, v_value))
+            logger().info("[To HA]{}/{}/{}_{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, Device.GAS, v_value))
         elif device == Device.FAN:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.FAN, room), v_value)
-            logger.info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.FAN, room, v_value))
+            logger().info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.FAN, room, v_value))
 
     def get_serial(self, packet_name, packet_len):
         packet = ''
@@ -517,12 +517,12 @@ class Kocom(rs485):
                 chksum = self.check_sum(packet)
                 if chksum[0]:
                     self.tick = time.time()
-                    logger.debug("[From {}]{}".format(packet_name, packet))
+                    logger().debug("[From {}]{}".format(packet_name, packet))
                     self.packet_parsing(packet)
                 packet = ''
                 start_flag = False
             if not self.connected:
-                logger.debug('[ERROR] 서버 연결이 끊어져 get_serial Thread를 종료합니다.')
+                logger().debug('[ERROR] 서버 연결이 끊어져 get_serial Thread를 종료합니다.')
                 break
 
     def check_sum(self, packet):
@@ -589,10 +589,10 @@ class Kocom(rs485):
         try:
             if v['command'] == "조회" and v['src_device'] == Device.WALLPAD:
                 if name == 'HA':
-                    self.write(self.make_packet(v['dst_device'], v['dst_room'], '조회', '', ''))
-                logger.debug('[{} {}]{}({}) {}({}) -> {}({})'.format(from_to, name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room']))
+                    self.write(self.make_packet(v['dst_device'], v['dst_room'], Command.QUERY, '', ''))
+                logger().debug('[{} {}]{}({}) {}({}) -> {}({})'.format(from_to, name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room']))
             else:
-                logger.debug('[{} {}]{}({}) {}({}) -> {}({}) = {}'.format(from_to, name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room'], v['value']))
+                logger().debug('[{} {}]{}({}) {}({}) -> {}({}) = {}'.format(from_to, name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room'], v['value']))
 
             if (v['type'] == 'ack' and v['dst_device'] == Device.WALLPAD) or (v['type'] == 'send' and v['dst_device'] == Device.ELEVATOR):
                 if v['type'] == 'send' and v['dst_device'] == Device.ELEVATOR:
@@ -605,11 +605,11 @@ class Kocom(rs485):
                     self.set_list(v['src_device'], v['src_room'], v['value'])
                     self.send_to_homeassistant(v['src_device'], v['src_room'], v['value'])
         except:
-            logger.info('[{} {}]Error {}'.format(from_to, name, packet))
+            logger().info('[{} {}]Error {}'.format(from_to, name, packet))
 
     def set_list(self, device, room, value, name='kocom'):
         try:
-            logger.info('[From {}]{}/{}/state = {}'.format(name, device, room, value))
+            logger().info('[From {}]{}/{}/state = {}'.format(name, device, room, value))
             if 'scan' in self.wp_list[device][room] and type(self.wp_list[device][room]['scan']) == dict:
                 self.wp_list[device][room]['scan']['tick'] = time.time()
                 self.wp_list[device][room]['scan']['count'] = 0
@@ -631,7 +631,7 @@ class Kocom(rs485):
                             self.wp_list[device][room][sub]['last'] = 'state'
                             self.wp_list[device][room][sub]['count'] = 0
                     except:
-                        logger.info('[From {}]Error SetListDevice {}/{}/{}/state = {}'.format(name, device, room, sub, v))
+                        logger().info('[From {}]Error SetListDevice {}/{}/{}/state = {}'.format(name, device, room, sub, v))
             elif device == Device.LIGHT or device == Device.PLUG:
                 for sub, v in value.items():
                     try:
@@ -640,7 +640,7 @@ class Kocom(rs485):
                             self.wp_list[device][room][sub]['last'] = 'state'
                             self.wp_list[device][room][sub]['count'] = 0
                     except:
-                        logger.info('[From {}]Error SetListDevice {}/{}/{}/state = {}'.format(name, device, room, sub, v))
+                        logger().info('[From {}]Error SetListDevice {}/{}/{}/state = {}'.format(name, device, room, sub, v))
             elif device == Device.THERMOSTAT:
                 for sub, v in value.items():
                     try:
@@ -653,9 +653,9 @@ class Kocom(rs485):
                             self.wp_list[device][room][sub]['last'] = 'state'
                             self.wp_list[device][room][sub]['count'] = 0
                     except:
-                        logger.info('[From {}]Error SetListDevice {}/{}/{}/state = {}'.format(name, device, room, sub, v))
+                        logger().info('[From {}]Error SetListDevice {}/{}/{}/state = {}'.format(name, device, room, sub, v))
         except:
-            logger.info('[From {}]Error SetList {}/{} = {}'.format(name, device, room, value))
+            logger().info('[From {}]Error SetList {}/{} = {}'.format(name, device, room, value))
 
     def scan_list(self):
         while True:
@@ -671,7 +671,7 @@ class Kocom(rs485):
                                             if now - r_list['scan']['last'] > 2:
                                                 r_list['scan']['count'] += 1
                                                 r_list['scan']['last'] = now
-                                                self.set_serial(device, room, '', '', cmd='조회')
+                                                self.set_serial(device, room, '', '', cmd=Command.QUERY)
                                                 time.sleep(conf().SCANNING_INTERVAL)
                                             if r_list['scan']['count'] > 4:
                                                 r_list['scan']['tick'] = now
@@ -694,27 +694,27 @@ class Kocom(rs485):
                                                         sub_v['last'] = 'set'
                                                         sub_v['count'] += 1
                     except:
-                        logger.debug('[Scan]Error')
+                        logger().debug('[Scan]Error')
             if not self.connected:
-                logger.debug('[ERROR] 서버 연결이 끊어져 scan_list Thread를 종료합니다.')
+                logger().debug('[ERROR] 서버 연결이 끊어져 scan_list Thread를 종료합니다.')
                 break
             time.sleep(0.2)
 
-    def set_serial(self, device, room, target, value, cmd='상태'):
+    def set_serial(self, device, room, target, value, cmd=Command.STATUS):
         if (time.time() - self.tick) < conf().KOCOM_INTERVAL / 1000:
             return
-        if cmd == '상태':
-            logger.info('[To {}]{}/{}/{} -> {}'.format(self._name, device, room, target, value))
-        elif cmd == '조회':
-            logger.info('[To {}]{}/{} -> 조회'.format(self._name, device, room))
-        packet = self.make_packet(device, room, '상태', target, value) if cmd == '상태' else  self.make_packet(device, room, '조회', '', '')
+        if cmd == Command.STATUS:
+            logger().info('[To {}]{}/{}/{} -> {}'.format(self._name, device, room, target, value))
+        elif cmd == Command.QUERY:
+            logger().info('[To {}]{}/{} -> 조회'.format(self._name, device, room))
+        packet = self.make_packet(device, room, Command.STATUS, target, value) if cmd == Command.STATUS else  self.make_packet(device, room, Command.QUERY, '', '')
         v = self.value_packet(self.parse_packet(packet))
 
-        logger.debug('[To {}]{}'.format(self._name, packet))
+        logger().debug('[To {}]{}'.format(self._name, packet))
         if v['command'] == "조회" and v['src_device'] == Device.WALLPAD:
-            logger.debug('[To {}]{}({}) {}({}) -> {}({})'.format(self._name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room']))
+            logger().debug('[To {}]{}({}) {}({}) -> {}({})'.format(self._name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room']))
         else:
-            logger.debug('[To {}]{}({}) {}({}) -> {}({}) = {}'.format(self._name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room'], v['value']))
+            logger().debug('[To {}]{}({}) {}({}) -> {}({}) = {}'.format(self._name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room'], v['value']))
         if device == Device.ELEVATOR:
             self.send_to_homeassistant(Device.ELEVATOR, Device.WALLPAD, OnOff.ON)
         self.write(packet)
@@ -726,70 +726,75 @@ class Kocom(rs485):
         p_dst = conf().KOCOM_DEVICE_REV.get(Device.WALLPAD) + conf().KOCOM_ROOM_REV.get(Device.WALLPAD)
         p_cmd = conf().KOCOM_COMMAND_REV.get(cmd)
         p_value = ''
-        if cmd == '조회':
-            p_value = '0000000000000000'
+
+        if room is Room.MASTER_LIGHT:
+            p_cmd = conf().KOCOM_COMMAND_REV.get(Command.MASTER_LIGHT_OFF) if cmd == Command.OFF else conf().KOCOM_COMMAND_REV.get(Command.MASTER_LIGHT_ON)
+            p_value = '0000000000000000' if cmd == Command.OFF else 'FFFFFFFFFFFFFFFF'
         else:
-            if device == Device.ELEVATOR:
-                p_device = conf().KOCOM_DEVICE_REV.get(Device.WALLPAD)
-                p_room = conf().KOCOM_ROOM_REV.get(Device.WALLPAD)
-                p_dst = conf().KOCOM_DEVICE_REV.get(device) + conf().KOCOM_ROOM_REV.get(Device.WALLPAD)
-                p_cmd = conf().KOCOM_COMMAND_REV.get(OnOff.ON)
+            if cmd == Command.QUERY:
                 p_value = '0000000000000000'
-            elif device == Device.GAS:
-                p_cmd = conf().KOCOM_COMMAND_REV.get(OnOff.OFF)
-                p_value = '0000000000000000'
-            elif device == Device.LIGHT or device == Device.PLUG:
-                try:
-                    all_device = device + str('0')
-                    for i in range(1,9):
-                        sub_device = device + str(i)
-                        if target != sub_device:
-                            if target == all_device:
-                                if sub_device in self.wp_list[device][room]:
-                                    p_value += 'ff' if value == OnOff.ON else str('00')
+            else:
+                if device == Device.ELEVATOR:
+                    p_device = conf().KOCOM_DEVICE_REV.get(Device.WALLPAD)
+                    p_room = conf().KOCOM_ROOM_REV.get(Device.WALLPAD)
+                    p_dst = conf().KOCOM_DEVICE_REV.get(device) + conf().KOCOM_ROOM_REV.get(Device.WALLPAD)
+                    p_cmd = conf().KOCOM_COMMAND_REV.get(OnOff.ON)
+                    p_value = '0000000000000000'
+                elif device == Device.GAS:
+                    p_cmd = conf().KOCOM_COMMAND_REV.get(OnOff.OFF)
+                    p_value = '0000000000000000'
+                elif device == Device.LIGHT or device == Device.PLUG:
+                    try:
+                        all_device = device + str('0')
+                        for i in range(1,9):
+                            sub_device = device + str(i)
+                            if target != sub_device:
+                                if target == all_device:
+                                    if sub_device in self.wp_list[device][room]:
+                                        p_value += 'ff' if value == OnOff.ON else str('00')
+                                    else:
+                                        p_value += '00'
                                 else:
-                                    p_value += '00'
+                                    if sub_device in self.wp_list[device][room] and self.wp_list[device][room][sub_device]['state'] == OnOff.ON:
+                                        p_value += 'ff'
+                                    else:
+                                        p_value += '00'
                             else:
-                                if sub_device in self.wp_list[device][room] and self.wp_list[device][room][sub_device]['state'] == OnOff.ON:
-                                    p_value += 'ff'
-                                else:
-                                    p_value += '00'
+                                p_value += 'ff' if value == OnOff.ON else str('00')
+                    except:
+                        logger().debug('[Make Packet] Error on Device.LIGHT or Device.PLUG')
+                elif device == Device.THERMOSTAT:
+                    try:
+                        mode = self.wp_list[device][room]['mode']['set']
+                        target_temp = self.wp_list[device][room]['target_temp']['set']
+                        if mode == 'heat':
+                            p_value += '1100'
+                        elif mode == OnOff.OFF:
+                            # p_value += '0001'
+                            p_value += '0100'
                         else:
-                            p_value += 'ff' if value == OnOff.ON else str('00')
-                except:
-                    logger.debug('[Make Packet] Error on Device.LIGHT or Device.PLUG')
-            elif device == Device.THERMOSTAT:
-                try:
-                    mode = self.wp_list[device][room]['mode']['set']
-                    target_temp = self.wp_list[device][room]['target_temp']['set']
-                    if mode == 'heat':
-                        p_value += '1100'
-                    elif mode == OnOff.OFF:
-                        # p_value += '0001'
-                        p_value += '0100'
-                    else:
-                        p_value += '1101'
-                    p_value += '{0:02x}'.format(int(float(target_temp)))
-                    p_value += '0000000000'
-                except:
-                    logger.debug('[Make Packet] Error on Device.THERMOSTAT')
-            elif device == Device.FAN:
-                try:
-                    mode = self.wp_list[device][room]['mode']['set']
-                    speed = self.wp_list[device][room]['speed']['set']
-                    if mode == OnOff.ON:
-                        p_value += '1100'
-                    elif mode == OnOff.OFF:
-                        p_value += '0001'
-                    p_value += conf().KOCOM_FAN_SPEED_REV.get(speed)
-                    p_value += '00000000000'
-                except:
-                    logger.debug('[Make Packet] Error on Device.THERMOSTAT')
-        if p_value != '':
-            packet = p_header + p_device + p_room + p_dst + p_cmd + p_value
-            chk_sum = self.check_sum(packet)[1]
-            packet += chk_sum + '0d0d'
-            return packet
+                            p_value += '1101'
+                        p_value += '{0:02x}'.format(int(float(target_temp)))
+                        p_value += '0000000000'
+                    except:
+                        logger().debug('[Make Packet] Error on Device.THERMOSTAT')
+                elif device == Device.FAN:
+                    try:
+                        mode = self.wp_list[device][room]['mode']['set']
+                        speed = self.wp_list[device][room]['speed']['set']
+                        if mode == OnOff.ON:
+                            p_value += '1100'
+                        elif mode == OnOff.OFF:
+                            p_value += '0001'
+                        p_value += conf().KOCOM_FAN_SPEED_REV.get(speed)
+                        p_value += '00000000000'
+                    except:
+                        logger().debug('[Make Packet] Error on Device.THERMOSTAT')
+            if p_value != '':
+                packet = p_header + p_device + p_room + p_dst + p_cmd + p_value
+                chk_sum = self.check_sum(packet)[1]
+                packet += chk_sum + '0d0d'
+                return packet
         return False
 
     def parse_fan(self, value='0000000000000000'):
@@ -800,13 +805,16 @@ class Kocom(rs485):
 
     def parse_switch(self, device, room, value='0000000000000000'):
         switch = {}
-        on_count = 0
-        to_i = conf().KOCOM_LIGHT_SIZE.get(room) + 1 if device == Device.LIGHT else conf().KOCOM_PLUG_SIZE.get(room) + 1
-        for i in range(1, to_i):
-            switch[device + str(i)] = OnOff.OFF if value[i*2-2:i*2] == '00' else OnOff.ON
-            if value[i*2-2:i*2] != '00':
-                on_count += 1
-        switch[device + str('0')] = OnOff.ON if on_count > 0 else OnOff.OFF
+        if room == Room.MASTER_LIGHT:
+            switch[room] = OnOff.ON if value is 'FFFFFFFFFFFFFFFF' else OnOff.OFF
+        else:
+            on_count = 0
+            to_i = conf().KOCOM_LIGHT_SIZE.get(room) + 1 if device == Device.LIGHT else conf().KOCOM_PLUG_SIZE.get(room) + 1
+            for i in range(1, to_i):
+                switch[device + str(i)] = OnOff.OFF if value[i*2-2:i*2] == '00' else OnOff.ON
+                if value[i*2-2:i*2] != '00':
+                    on_count += 1
+            switch[device + str('0')] = OnOff.ON if on_count > 0 else OnOff.OFF
         return switch
 
     def parse_thermostat(self, value='0000000000000000', init_temp=False):

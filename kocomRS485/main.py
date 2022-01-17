@@ -1,6 +1,7 @@
 from rs485 import *
 from utility import *
 from settings import *
+from kocom import *
 
 if __name__ == '__main__':
     readConfiguration()

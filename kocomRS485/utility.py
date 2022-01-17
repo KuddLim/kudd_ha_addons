@@ -27,7 +27,7 @@ def make_logger(log_path):
     if theLogger is None:
         #theLogger 인스턴스 생성 및 로그레벨 설정
         theLogger = logging.getLogger(ConfString.LOGNAME)
-        theLogger.setLevel(logging.INFO)
+        theLogger.setLevel(logging.DEBUG)
         if conf().CONF_LOGLEVEL == LogLevel.INFO: theLogger.setLevel(logging.INFO)
         if conf().CONF_LOGLEVEL == LogLevel.DEBUG: theLogger.setLevel(logging.DEBUG)
         if conf().CONF_LOGLEVEL == LogLevel.WARN: theLogger.setLevel(logging.WARN)

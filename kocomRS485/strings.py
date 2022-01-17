@@ -3,14 +3,17 @@ from collections import namedtuple
 OnOffTup = namedtuple('OnOff', ['ON', 'OFF'])
 OnOff = OnOffTup('on', 'off')
 
-DeviceTup = namedtuple('Device', ['WALLPAD', 'LIGHT', 'THERMOSTAT', 'PLUG', 'GAS', 'ELEVATOR', 'FAN', 'MASTER_LIGHT'])
-Device = DeviceTup('wallpad', 'light', 'thermostat', 'plug', 'gas', 'elevator', 'fan', 'master_light')
+DeviceTup = namedtuple('Device', ['WALLPAD', 'LIGHT', 'THERMOSTAT', 'PLUG', 'GAS', 'ELEVATOR', 'FAN'])
+Device = DeviceTup('wallpad', 'light', 'thermostat', 'plug', 'gas', 'elevator', 'fan')
 
 SpeedTup = namedtuple('Speed', ['LOW', 'MEDIUM', 'HIGH'])
 Speed = SpeedTup('low', 'medium', 'high')
 
-RoomTup = namedtuple('Room', ['LIVINGROOM', 'BEDROOM', 'ROOM1', 'ROOM2', 'KITCHEN'])
-Room = RoomTup('livingroom', 'bedroom', 'room1', 'room2', 'kitchen')
+CommandTup = namedtuple('Command', ['QUERY', 'STATUS', 'MASTER_LIGHT_ON', 'MASTER_LIGHT_OFF'])
+Command = CommandTup('query', 'status', 'master_light_on', 'master_light_off')
+
+RoomTup = namedtuple('Room', ['LIVINGROOM', 'BEDROOM', 'ROOM1', 'ROOM2', 'KITCHEN', 'MASTER_LIGHT'])
+Room = RoomTup('livingroom', 'bedroom', 'room1', 'room2', 'kitchen', 'master_light')
 
 GrexModeTup = namedtuple('GrexMode', ['AUTO', 'MANUAL', 'SLEEP'])
 GrexMode = GrexModeTup('auto', 'manual', 'sleep')
