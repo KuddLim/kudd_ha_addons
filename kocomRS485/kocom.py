@@ -1,5 +1,7 @@
 from rs485 import *
 
+# v.1.20
+
 class Kocom(rs485):
     def __init__(self, client, name, device, packet_len):
         self.client = client

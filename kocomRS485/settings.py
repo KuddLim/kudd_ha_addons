@@ -4,6 +4,8 @@ import json
 
 from strings import *
 
+# v1.2.0
+
 class Globals:
     def __init__(self):
         # Version

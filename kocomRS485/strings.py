@@ -1,5 +1,7 @@
 from collections import namedtuple
 
+# v.1.2.0
+
 OnOffTup = namedtuple('OnOff', ['ON', 'OFF'])
 OnOff = OnOffTup('on', 'off')
 
