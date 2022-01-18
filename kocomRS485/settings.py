@@ -17,12 +17,12 @@ class Globals:
         self.DEFAULT_SPEED = Speed.MEDIUM
         # 조명 / 플러그 갯수
         self.KOCOM_LIGHT_SIZE            = {Room.LIVINGROOM: 3, Room.BEDROOM: 2, Room.ROOM1: 2, Room.ROOM2: 2, Room.KITCHEN: 3, Room.MASTER_LIGHT: 1}
-        self.KOCOM_PLUG_SIZE             = {Room.LIVINGROOM: 2, Room.BEDROOM: 2, Room.ROOM1: 2, Room.ROOM2: 2, Room.KITCHEN: 2}
+        self.KOCOM_PLUG_SIZE             = {Room.LIVINGROOM: 2, Room.BEDROOM: 2, Room.ROOM1: 2, Room.ROOM2: 2, Room.KITCHEN: 2, Room.MASTER_LIGHT: 0}
 
         # 방 패킷에 따른 방이름 (패킷1: 방이름1, 패킷2: 방이름2 . . .)
         # 월패드에서 장치를 작동하며 방이름(livingroom, bedroom, room1, room2, kitchen 등)을 확인하여 본인의 상황에 맞게 바꾸세요
         # 조명/콘센트와 난방의 방패킷이 달라서 두개로 나뉘어있습니다.
-        self.KOCOM_ROOM                  = {'00': Room.LIVINGROOM, '01': Room.BEDROOM, '02': Room.ROOM2, '03': Room.ROOM1, '04': Room.KITCHEN, 'ff': Room.MASTER }
+        self.KOCOM_ROOM                  = {'00': Room.LIVINGROOM, '01': Room.BEDROOM, '02': Room.ROOM2, '03': Room.ROOM1, '04': Room.KITCHEN, 'ff': Room.MASTER_LIGHT }
         self.KOCOM_ROOM_THERMOSTAT       = {'00': Room.LIVINGROOM, '01': Room.BEDROOM, '02': Room.ROOM1, '03': Room.ROOM2}
 
         # TIME 변수(초)
