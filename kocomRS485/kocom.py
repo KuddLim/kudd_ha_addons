@@ -815,6 +815,7 @@ class Kocom(rs485):
                 if value[i*2-2:i*2] != '00':
                     on_count += 1
             switch[device + str('0')] = OnOff.ON if on_count > 0 else OnOff.OFF
+        logger().info('device, room, switch : {}, {}, {}'.format(device, room, str(switch)))
         return switch
 
     def parse_thermostat(self, value='0000000000000000', init_temp=False):
