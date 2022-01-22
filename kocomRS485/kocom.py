@@ -1,12 +1,15 @@
+import traceback
+
 from rs485 import *
 
 # v.1.20
 
 class Kocom(rs485):
     def __init__(self, client, name, device, packet_len):
-        self.client = client
+        self.client = client    # client: instance of rs485
         self._name = name
         self.connected = True
+        self.d_mqtt = None
 
         self.ha_registry = False
         self.kocom_scan = True
@@ -69,7 +72,7 @@ class Kocom(rs485):
 
     def read(self):
         if self.client._connect == False:
-            return ''
+            return None
         try:
             if self.d_type == 'serial':
                 if self.d_serial.readable():
@@ -196,7 +199,9 @@ class Kocom(rs485):
                     self.wp_list[device][room][sub_device][command] = payload
                     self.wp_list[device][room][sub_device]['last'] = command
                 logger().info('[From HA]{}/{}/{}/{} = {}'.format(device, room, sub_device, command, payload))
-            except:
+            except Exception as e:
+                logger().info(str(e))
+                logger().info(str(traceback.format_exc()))
                 logger().info('[From HA]Error {} = {}'.format(topic, payload))
         elif device == HAStrings.CLIMATE:
             device = Device.THERMOSTAT
@@ -468,14 +473,16 @@ class Kocom(rs485):
                     else:
                         publish_list.append({ha_topic : json.dumps(ha_payload)})
 
-        if initial:
-            self.d_mqtt.subscribe(subscribe_list)
-        for ha in publish_list:
-            for topic, payload in ha.items():
-                self.d_mqtt.publish(topic, payload)
+        if self.d_mqtt is not None:
+            if initial:
+                self.d_mqtt.subscribe(subscribe_list)
+            for ha in publish_list:
+                for topic, payload in ha.items():
+                    self.d_mqtt.publish(topic, payload)
         self.ha_registry = ha_topic
 
     def send_to_homeassistant(self, device, room, value):
+        logger().info('send_to_homeassistant device, room, value = {}, {}, {}'.format(device, room, value))
         v_value = json.dumps(value)
         if device == Device.LIGHT:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.LIGHT, room), v_value)
@@ -505,6 +512,10 @@ class Kocom(rs485):
         start_flag = False
         while True:
             row_data = self.read()
+            if row_data == None:
+                time.sleep(0.1)
+                continue
+
             hex_d = row_data.hex()
             start_hex = ''
             if packet_name == 'kocom':  start_hex = 'aa'
@@ -540,12 +551,12 @@ class Kocom(rs485):
             p['header'] = packet[:4]
             p['type'] = packet[4:7]
             p['order'] = packet[7:8]
-            if conf().KOCOM_TYPE.get(p['type']) == 'send':
+            if conf().KOCOM_TYPE.get(p['type']) == SendAck.SEND:
                 p['dst_device'] = packet[10:12]
                 p['dst_room'] = packet[12:14]
                 p['src_device'] = packet[14:16]
                 p['src_room'] = packet[16:18]
-            elif conf().KOCOM_TYPE.get(p['type']) == 'ack':
+            elif conf().KOCOM_TYPE.get(p['type']) == SendAck.ACK or conf().KOCOM_TYPE.get(p['type']) == SendAck.MASTER_LIGHT:
                 p['src_device'] = packet[10:12]
                 p['src_room'] = packet[12:14]
                 p['dst_device'] = packet[14:16]
@@ -561,6 +572,7 @@ class Kocom(rs485):
     def value_packet(self, p):
         v = {}
         if not p:
+            logger().info('trying to parse empty data')
             return False
         try:
             v['type'] = conf().KOCOM_TYPE.get(p['type'])
@@ -581,7 +593,9 @@ class Kocom(rs485):
             elif v['src_device'] == Device.GAS:
                 v['value'] = v['command']
             return v
-        except:
+        except Exception as e:
+            logger().info(str(e))
+            logger().info(str(traceback.format_exc()))
             return False
 
     def packet_parsing(self, packet, name='kocom', from_to='From'):
@@ -589,15 +603,20 @@ class Kocom(rs485):
         v = self.value_packet(p)
 
         try:
-            if v['command'] == "조회" and v['src_device'] == Device.WALLPAD:
+            if v['command'] == Command.QUERY and v['src_device'] == Device.WALLPAD:
                 if name == 'HA':
                     self.write(self.make_packet(v['dst_device'], v['dst_room'], Command.QUERY, '', ''))
                 logger().debug('[{} {}]{}({}) {}({}) -> {}({})'.format(from_to, name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room']))
             else:
                 logger().debug('[{} {}]{}({}) {}({}) -> {}({}) = {}'.format(from_to, name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room'], v['value']))
 
-            if (v['type'] == 'ack' and v['dst_device'] == Device.WALLPAD) or (v['type'] == 'send' and v['dst_device'] == Device.ELEVATOR):
-                if v['type'] == 'send' and v['dst_device'] == Device.ELEVATOR:
+            if v['src_device'] == Device.LIGHT and v['src_room'] == Room.MASTER_LIGHT:
+                # TODO: 여기서도 HA 로 전송필요.KL
+                logger().info('send parsed value to HA : {}'.format(v['value']))
+                self.set_list(v['src_device'], Room.MASTER_LIGHT, v['value'])
+                self.send_to_homeassistant(v['src_device'], v['src_room'], v['value'])
+            if (v['type'] == SendAck.ACK and v['dst_device'] == Device.WALLPAD) or (v['type'] == SendAck.SEND and v['dst_device'] == Device.ELEVATOR):
+                if v['type'] == SendAck.SEND and v['dst_device'] == Device.ELEVATOR:
                     self.set_list(v['dst_device'], Device.WALLPAD, v['value'])
                     self.send_to_homeassistant(v['dst_device'], Device.WALLPAD, v['value'])
                 elif v['src_device'] == Device.FAN or v['src_device'] == Device.GAS:
@@ -606,7 +625,9 @@ class Kocom(rs485):
                 elif v['src_device'] == Device.THERMOSTAT or v['src_device'] == Device.LIGHT or v['src_device'] == Device.PLUG:
                     self.set_list(v['src_device'], v['src_room'], v['value'])
                     self.send_to_homeassistant(v['src_device'], v['src_room'], v['value'])
-        except:
+        except Exception as e:
+            logger().info(str(e))
+            logger().info(str(traceback.format_exc()))
             logger().info('[{} {}]Error {}'.format(from_to, name, packet))
 
     def set_list(self, device, room, value, name='kocom'):
@@ -635,6 +656,8 @@ class Kocom(rs485):
                     except:
                         logger().info('[From {}]Error SetListDevice {}/{}/{}/state = {}'.format(name, device, room, sub, v))
             elif device == Device.LIGHT or device == Device.PLUG:
+                # TODO: 이곳에 임의로 master light 설정을 할까.
+                # [From kocom]light/livingroom/state = {'light1': 'off', 'light2': 'off', 'light3': 'off', 'light0': 'off'}
                 for sub, v in value.items():
                     try:
                         self.wp_list[device][room][sub]['state'] = v
@@ -702,18 +725,41 @@ class Kocom(rs485):
                 break
             time.sleep(0.2)
 
+    def make_master_light_value(self, onOff):
+        d = {}
+        d[Device.LIGHT + str('0')] = onOff
+        d[Device.LIGHT + str('1')] = onOff
+        return d
+
     def set_serial(self, device, room, target, value, cmd=Command.STATUS):
         if (time.time() - self.tick) < conf().KOCOM_INTERVAL / 1000:
             return
         if cmd == Command.STATUS:
             logger().info('[To {}]{}/{}/{} -> {}'.format(self._name, device, room, target, value))
         elif cmd == Command.QUERY:
-            logger().info('[To {}]{}/{} -> 조회'.format(self._name, device, room))
+            logger().info('[To {}]{}/{} -> {}'.format(self._name, device, room, Command.QUERY))
+
+        # TODO: MASTER_LIGHT 으로의 명령이 온다면, Status 를 받은것처럼 처리해야함.
+        # STATUS 가 오면, value 를 그대로 사용.
+        # QUERY 가 오면, 마지막 상태를 전송.
+        # homeassistant 로 전송을 해야하나???
+        if device == Device.LIGHT and room == Room.MASTER_LIGHT:
+            if cmd == Command.STATUS:
+                v = self.make_master_light_value(value)
+                logger().info('send back to homeassistant device, room, value = {}, {}, {}'.format(device, room, v))
+                self.send_to_homeassistant(device, room, v)
+            else:
+                logger().info('send back last status to homeassistant device, room, value = {}, {}, {}'.format(device, room, value))
+                logger().info('device state : {}'.format(self.wp_list[device][room]))
+                self.send_to_homeassistant(device, room, value)
+
+        logger().info('calling make_packet from set_serial')
+
         packet = self.make_packet(device, room, Command.STATUS, target, value) if cmd == Command.STATUS else  self.make_packet(device, room, Command.QUERY, '', '')
         v = self.value_packet(self.parse_packet(packet))
 
         logger().debug('[To {}]{}'.format(self._name, packet))
-        if v['command'] == "조회" and v['src_device'] == Device.WALLPAD:
+        if v['command'] == Command.QUERY and v['src_device'] == Device.WALLPAD:
             logger().debug('[To {}]{}({}) {}({}) -> {}({})'.format(self._name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room']))
         else:
             logger().debug('[To {}]{}({}) {}({}) -> {}({}) = {}'.format(self._name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room'], v['value']))
@@ -728,10 +774,23 @@ class Kocom(rs485):
         p_dst = conf().KOCOM_DEVICE_REV.get(Device.WALLPAD) + conf().KOCOM_ROOM_REV.get(Device.WALLPAD)
         p_cmd = conf().KOCOM_COMMAND_REV.get(cmd)
         p_value = ''
+        writeTrace = False
 
-        if room is Room.MASTER_LIGHT:
-            p_cmd = conf().KOCOM_COMMAND_REV.get(Command.MASTER_LIGHT_OFF) if cmd == Command.OFF else conf().KOCOM_COMMAND_REV.get(Command.MASTER_LIGHT_ON)
-            p_value = '0000000000000000' if cmd == Command.OFF else 'FFFFFFFFFFFFFFFF'
+        logger().info('[make_packet] room, Room.MASTER_LIGHT = {}, {}'.format(room, Room.MASTER_LIGHT))
+
+        if str(room) == str(Room.MASTER_LIGHT):
+            logger().info('Generating packet of masterlight started')
+            try:
+                # p_header + [p_device + p_room] + [p_dst = WALLPAD 01 00] + p_cmd + p_value
+                p_header = 'aa55309c00'
+                p_room = conf().KOCOM_ROOM_REV.get(room)
+                p_cmd = conf().KOCOM_COMMAND_REV.get(Command.MASTER_LIGHT_OFF) if cmd == OnOff.OFF else conf().KOCOM_COMMAND_REV.get(Command.MASTER_LIGHT_ON)
+                p_value = '0000000000000000' if cmd == OnOff.OFF else 'FFFFFFFFFFFFFFFF'
+            except Exception as e:
+                logger().info(str(e))
+                logger().info(str(traceback.format_exc()))
+            writeTrace = True
+            logger().info('Generating packet of masterlight finished')
         else:
             if cmd == Command.QUERY:
                 p_value = '0000000000000000'
@@ -792,11 +851,13 @@ class Kocom(rs485):
                         p_value += '00000000000'
                     except:
                         logger().debug('[Make Packet] Error on Device.THERMOSTAT')
-            if p_value != '':
-                packet = p_header + p_device + p_room + p_dst + p_cmd + p_value
-                chk_sum = self.check_sum(packet)[1]
-                packet += chk_sum + '0d0d'
-                return packet
+        if p_value != '':
+            packet = p_header + p_device + p_room + p_dst + p_cmd + p_value
+            chk_sum = self.check_sum(packet)[1]
+            packet += chk_sum + '0d0d'
+            if writeTrace:
+                logger().info('masterlight_command : ' + packet)
+            return packet
         return False
 
     def parse_fan(self, value='0000000000000000'):
@@ -806,9 +867,11 @@ class Kocom(rs485):
         return fan
 
     def parse_switch(self, device, room, value='0000000000000000'):
+        logger().info('device, room : {}, {}'.format(device, room))
         switch = {}
         if room == Room.MASTER_LIGHT:
-            switch[room] = OnOff.ON if value is 'FFFFFFFFFFFFFFFF' else OnOff.OFF
+            switch[device + str('1')] = OnOff.ON if value.upper() == 'FFFFFFFFFFFFFFFF' else OnOff.OFF
+            switch[device + str('0')] = switch[device + str('1')]
         else:
             on_count = 0
             to_i = conf().KOCOM_LIGHT_SIZE.get(room) + 1 if device == Device.LIGHT else conf().KOCOM_PLUG_SIZE.get(room) + 1

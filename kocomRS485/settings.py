@@ -33,8 +33,8 @@ class Globals:
 
         # KOCOM 코콤 패킷 기본정보
         self.KOCOM_DEVICE                = {'01': Device.WALLPAD, '0e': Device.LIGHT, '36': Device.THERMOSTAT, '3b': Device.PLUG, '44': Device.ELEVATOR, '2c': Device.GAS, '48': Device.FAN}
-        self.KOCOM_COMMAND               = {'3a': Command.QUERY, '00': Command.STATUS, '01': OnOff.ON, '02': OnOff.OFF, '65': Command.MASTER_LIGHT_ON, '66': Command.MASTER_LIGHT_OFF}
-        self.KOCOM_TYPE                  = {'30b': 'send', '30d': 'ack'}
+        self.KOCOM_COMMAND               = {'3a': Command.QUERY, '00': Command.STATUS, '01': OnOff.ON, '02': OnOff.OFF, '65': Command.MASTER_LIGHT_OFF, '66': Command.MASTER_LIGHT_ON}
+        self.KOCOM_TYPE                  = {'30b': SendAck.SEND, '30d': SendAck.ACK, '309': SendAck.MASTER_LIGHT}
         self.KOCOM_FAN_SPEED             = {'4': Speed.LOW, '8': Speed.MEDIUM, 'c': Speed.HIGH, '0': OnOff.OFF}
         self.KOCOM_DEVICE_REV            = {v: k for k, v in self.KOCOM_DEVICE.items()}
         self.KOCOM_ROOM_REV              = {v: k for k, v in self.KOCOM_ROOM.items()}
@@ -75,23 +75,35 @@ def readConfiguration():
             dict_data = json_data[ConfString.KOCOM_PLUG_SIZE]
             for i in dict_data:
                 conf().KOCOM_PLUG_SIZE[i[ConfString.NAME]] = i[ConfString.NUMBER]
-            num = 0
-            conf().KOCOM_ROOM = {}
+            #num = 0
+            #conf().KOCOM_ROOM = {}
+            #list_data = json_data[ConfString.KOCOM_ROOM]
+            #for i in list_data:
+            #    if num < 10:
+            #        num_key = "0%d" % (num)
+            #    else:
+            #        num_key = "%d" % (num)
+            #    conf().KOCOM_ROOM[num_key] = i
+            #    num += 1
+            #num = 0
+            #conf().KOCOM_ROOM_THERMOSTAT = {}
+            #list_data = json_data[ConfString.KOCOM_ROOM_THERMOSTAT]
+            #for i in list_data:
+            #    if num < 10:
+            #        num_key = "0%d" % (num)
+            #    else:
+            #        num_key = "%d" % (num)
+            #    conf().KOCOM_ROOM_THERMOSTAT[num_key] = i
+            #    num += 1
             list_data = json_data[ConfString.KOCOM_ROOM]
-            for i in list_data:
-                if num < 10:
-                    num_key = "0%d" % (num)
-                else:
-                    num_key = "%d" % (num)
-                conf().KOCOM_ROOM[num_key] = i
-                num += 1
-            num = 0
-            conf().KOCOM_ROOM_THERMOSTAT = {}
+            for room in list_data:
+                if room not in conf().KOCOM_ROOM.values():
+                    k = conf().KOCOM_ROOM_REV.get(room)
+                    conf().KOCOM_ROOM.pop(k)
+                    conf().KOCOM_ROOM_REV.pop(room)
             list_data = json_data[ConfString.KOCOM_ROOM_THERMOSTAT]
-            for i in list_data:
-                if num < 10:
-                    num_key = "0%d" % (num)
-                else:
-                    num_key = "%d" % (num)
-                conf().KOCOM_ROOM_THERMOSTAT[num_key] = i
-                num += 1
+            for room in list_data:
+                if room not in conf().KOCOM_ROOM_THERMOSTAT.values():
+                    k = conf().KOCOM_ROOM_THERMOSTATREV.get(room)
+                    conf().KOCOM_ROOM_THERMOSTAT.pop(k)
+                    conf().KOCOM_ROOM_THERMOSTAT.pop(room)

@@ -77,7 +77,7 @@
         "number": 3
       },
       {
-        "name": "master_light",
+        "name": "masterlight",
         "number" : 1
       }
     ],
@@ -103,7 +103,7 @@
         "number": 3
       },
       {
-        "name": "master_light",
+        "name": "masterlight",
         "number": 0
       }
     ],
@@ -113,7 +113,7 @@
       "room1",
       "room2",
       "kitchen",
-      "master_light"
+      "masterlight"
     ],
     "KOCOM_ROOM_THERMOSTAT": [
       "livingroom",

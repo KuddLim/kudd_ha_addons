@@ -11,11 +11,14 @@ Device = DeviceTup('wallpad', 'light', 'thermostat', 'plug', 'gas', 'elevator', 
 SpeedTup = namedtuple('Speed', ['LOW', 'MEDIUM', 'HIGH'])
 Speed = SpeedTup('low', 'medium', 'high')
 
+SendAckTup = namedtuple('SendAck', ['SEND', 'ACK', 'MASTER_LIGHT'])
+SendAck = SendAckTup('send', 'ack', 'masterlight')
+
 CommandTup = namedtuple('Command', ['QUERY', 'STATUS', 'MASTER_LIGHT_ON', 'MASTER_LIGHT_OFF'])
-Command = CommandTup('query', 'status', 'master_light_on', 'master_light_off')
+Command = CommandTup('query', 'status', 'masterlighton', 'masterlightoff')
 
 RoomTup = namedtuple('Room', ['LIVINGROOM', 'BEDROOM', 'ROOM1', 'ROOM2', 'KITCHEN', 'MASTER_LIGHT'])
-Room = RoomTup('livingroom', 'bedroom', 'room1', 'room2', 'kitchen', 'master_light')
+Room = RoomTup('livingroom', 'bedroom', 'room1', 'room2', 'kitchen', 'masterlight')
 
 GrexModeTup = namedtuple('GrexMode', ['AUTO', 'MANUAL', 'SLEEP'])
 GrexMode = GrexModeTup('auto', 'manual', 'sleep')
