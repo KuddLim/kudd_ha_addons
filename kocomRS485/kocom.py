@@ -776,7 +776,7 @@ class Kocom(rs485):
         p_value = ''
         writeTrace = False
 
-        logger().info('[make_packet] room, Room.MASTER_LIGHT = {}, {}'.format(room, Room.MASTER_LIGHT))
+        logger().info('[make_packet] room, cmd, value = {}, {}, {}'.format(room, cmd, value))
 
         if str(room) == str(Room.MASTER_LIGHT):
             logger().info('Generating packet of masterlight started')
@@ -784,8 +784,8 @@ class Kocom(rs485):
                 # p_header + [p_device + p_room] + [p_dst = WALLPAD 01 00] + p_cmd + p_value
                 p_header = 'aa55309c00'
                 p_room = conf().KOCOM_ROOM_REV.get(room)
-                p_cmd = conf().KOCOM_COMMAND_REV.get(Command.MASTER_LIGHT_OFF) if cmd == OnOff.OFF else conf().KOCOM_COMMAND_REV.get(Command.MASTER_LIGHT_ON)
-                p_value = '0000000000000000' if cmd == OnOff.OFF else 'FFFFFFFFFFFFFFFF'
+                p_cmd = conf().KOCOM_COMMAND_REV.get(Command.MASTER_LIGHT_OFF) if value == OnOff.OFF else conf().KOCOM_COMMAND_REV.get(Command.MASTER_LIGHT_ON)
+                p_value = '0000000000000000' if value == OnOff.OFF else 'FFFFFFFFFFFFFFFF'
             except Exception as e:
                 logger().info(str(e))
                 logger().info(str(traceback.format_exc()))
