@@ -67,7 +67,7 @@ class Kocom(rs485):
         self._t1.join()
         self._t2.join()
         if not self.connected:
-            logger().debug('[ERROR] 서버 연결이 끊어져 kocom 클래스를 종료합니다.')
+            logger().info('[ERROR] Connection closed. Terminating Kocom addon.')
             return False
 
     def read(self):
@@ -107,7 +107,7 @@ class Kocom(rs485):
 
         if server['anonymous'] != BooleanStr.TRUE:
             if server['server'] == '' or server['username'] == '' or server['password'] == '':
-                logger().info('{} 설정을 확인하세요. Server[{}] ID[{}] PW[{}] Device[{}]'.format(ConfString.MQTT, server['server'], server['username'], server['password'], name))
+                logger().info('{} Please check configuration. Server[{}] ID[{}] PW[{}] Device[{}]'.format(ConfString.MQTT, server['server'], server['username'], server['password'], name))
                 return False
             mqtt_client.username_pw_set(username=server['username'], password=server['password'])
             logger().debug('{} STATUS. Server[{}] ID[{}] PW[{}] Device[{}]'.format(ConfString.MQTT, server['server'], server['username'], server['password'], name))
@@ -149,17 +149,17 @@ class Kocom(rs485):
                     elif d_name == Device.LIGHT or d_name == Device.PLUG:
                         for r_name in conf().KOCOM_ROOM.values():
                             self.wp_list[d_name][r_name] = {'scan': {'tick': 0, 'count': 0, 'last': 0}}
-                logger().info('[From HA]HomeAssistant Scan')
+                logger().debug('[From HA]HomeAssistant Scan')
                 return
             elif _topic[3] == 'packet':
                 self.packet_parsing(_payload.lower(), name='HA')
             elif _topic[3] == 'check_sum':
                 chksum = self.check_sum(_payload.lower())
-                logger().info('[From HA]{} = {}({})'.format(_payload, chksum[0], chksum[1]))
+                logger().debug('[From HA]{} = {}({})'.format(_payload, chksum[0], chksum[1]))
         elif not self.kocom_scan:
             self.parse_message(_topic, _payload)
             return
-        logger().info("Message: {} = {}".format(msg.topic, _payload))
+        logger().debug("Message: {} = {}".format(msg.topic, _payload))
 
         if self.ha_registry != False and self.ha_registry == msg.topic and self.kocom_scan:
             self.kocom_scan = False
@@ -198,7 +198,7 @@ class Kocom(rs485):
                 else:
                     self.wp_list[device][room][sub_device][command] = payload
                     self.wp_list[device][room][sub_device]['last'] = command
-                logger().info('[From HA]{}/{}/{}/{} = {}'.format(device, room, sub_device, command, payload))
+                logger().debug('[From HA]{}/{}/{}/{} = {}'.format(device, room, sub_device, command, payload))
             except Exception as e:
                 logger().info(str(e))
                 logger().info(str(traceback.format_exc()))
@@ -220,7 +220,7 @@ class Kocom(rs485):
                     'target_temp': self.wp_list[device][room]['target_temp']['set'],
                     'current_temp': self.wp_list[device][room]['current_temp']['state']
                 }
-                logger().info('[From HA]{}/{}/set = [mode={}, target_temp={}]'.format(device, room, self.wp_list[device][room]['mode']['set'], self.wp_list[device][room]['target_temp']['set']))
+                logger().debug('[From HA]{}/{}/set = [mode={}, target_temp={}]'.format(device, room, self.wp_list[device][room]['mode']['set'], self.wp_list[device][room]['target_temp']['set']))
                 self.send_to_homeassistant(device, room, ha_payload)
             except:
                 logger().info('[From HA]Error {} = {}'.format(topic, payload))
@@ -240,10 +240,10 @@ class Kocom(rs485):
                     'mode': self.wp_list[device][room]['mode']['set'],
                     'speed': self.wp_list[device][room]['speed']['set']
                 }
-                logger().info('[From HA]{}/{}/set = [mode={}, speed={}]'.format(device, room, self.wp_list[device][room]['mode']['set'], self.wp_list[device][room]['speed']['set']))
+                logger().debug('[From HA]{}/{}/set = [mode={}, speed={}]'.format(device, room, self.wp_list[device][room]['mode']['set'], self.wp_list[device][room]['speed']['set']))
                 self.send_to_homeassistant(device, room, ha_payload)
             except:
-                logger().info('[From HA]Error {} = {}'.format(topic, payload))
+                logger().debug('[From HA]Error {} = {}'.format(topic, payload))
 
     def on_publish(self, client, obj, mid):
         logger().info("Publish: {}".format(str(mid)))
@@ -482,30 +482,30 @@ class Kocom(rs485):
         self.ha_registry = ha_topic
 
     def send_to_homeassistant(self, device, room, value):
-        logger().info('send_to_homeassistant device, room, value = {}, {}, {}'.format(device, room, value))
+        logger().debug('send_to_homeassistant device, room, value = {}, {}, {}'.format(device, room, value))
         v_value = json.dumps(value)
         if device == Device.LIGHT:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.LIGHT, room), v_value)
-            logger().info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.LIGHT, room, v_value))
+            logger().debug("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.LIGHT, room, v_value))
         elif device == Device.PLUG:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.SWITCH, room), v_value)
-            logger().info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, v_value))
+            logger().debug("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, v_value))
         elif device == Device.THERMOSTAT:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.CLIMATE, room), v_value)
-            logger().info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.CLIMATE, room, v_value))
+            logger().debug("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.CLIMATE, room, v_value))
         elif device == Device.ELEVATOR:
             v_value = json.dumps({device: value})
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.SWITCH, room), v_value)
-            logger().info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, v_value))
+            logger().debug("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, v_value))
         elif device == Device.GAS:
             v_value = json.dumps({device: value})
             self.d_mqtt.publish("{}/{}/{}_{}/state".format(HAStrings.PREFIX, HAStrings.SENSOR, room, Device.GAS), v_value)
-            logger().info("[To HA]{}/{}/{}_{}/state = {}".format(HAStrings.PREFIX, HAStrings.SENSOR, room, Device.GAS, v_value))
+            logger().debug("[To HA]{}/{}/{}_{}/state = {}".format(HAStrings.PREFIX, HAStrings.SENSOR, room, Device.GAS, v_value))
             self.d_mqtt.publish("{}/{}/{}_{}/state".format(HAStrings.PREFIX, HAStrings.SWITCH, room, Device.GAS), v_value)
-            logger().info("[To HA]{}/{}/{}_{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, Device.GAS, v_value))
+            logger().debug("[To HA]{}/{}/{}_{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, Device.GAS, v_value))
         elif device == Device.FAN:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.FAN, room), v_value)
-            logger().info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.FAN, room, v_value))
+            logger().debug("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.FAN, room, v_value))
 
     def get_serial(self, packet_name, packet_len):
         packet = ''
@@ -535,7 +535,7 @@ class Kocom(rs485):
                 packet = ''
                 start_flag = False
             if not self.connected:
-                logger().debug('[ERROR] 서버 연결이 끊어져 get_serial Thread를 종료합니다.')
+                logger().debug('[ERROR] Connection closed. Terminating get_serial thread.')
                 break
 
     def check_sum(self, packet):
@@ -572,7 +572,7 @@ class Kocom(rs485):
     def value_packet(self, p):
         v = {}
         if not p:
-            logger().info('trying to parse empty data')
+            logger().debug('trying to parse empty data')
             return False
         try:
             v['type'] = conf().KOCOM_TYPE.get(p['type'])
@@ -612,7 +612,7 @@ class Kocom(rs485):
 
             if v['src_device'] == Device.LIGHT and v['src_room'] == Room.MASTER_LIGHT:
                 # TODO: 여기서도 HA 로 전송필요.KL
-                logger().info('send parsed value to HA : {}'.format(v['value']))
+                logger().debug('send parsed value to HA : {}'.format(v['value']))
                 self.set_list(v['src_device'], Room.MASTER_LIGHT, v['value'])
                 self.send_to_homeassistant(v['src_device'], v['src_room'], v['value'])
             if (v['type'] == SendAck.ACK and v['dst_device'] == Device.WALLPAD) or (v['type'] == SendAck.SEND and v['dst_device'] == Device.ELEVATOR):
@@ -632,7 +632,7 @@ class Kocom(rs485):
 
     def set_list(self, device, room, value, name='kocom'):
         try:
-            logger().info('[From {}]{}/{}/state = {}'.format(name, device, room, value))
+            logger().debug('[From {}]{}/{}/state = {}'.format(name, device, room, value))
             if 'scan' in self.wp_list[device][room] and type(self.wp_list[device][room]['scan']) == dict:
                 self.wp_list[device][room]['scan']['tick'] = time.time()
                 self.wp_list[device][room]['scan']['count'] = 0
@@ -721,7 +721,7 @@ class Kocom(rs485):
                     except:
                         logger().debug('[Scan]Error')
             if not self.connected:
-                logger().debug('[ERROR] 서버 연결이 끊어져 scan_list Thread를 종료합니다.')
+                logger().debug('[ERROR] Connection closed. Terminating scan_list thread.')
                 break
             time.sleep(0.2)
 
@@ -735,9 +735,9 @@ class Kocom(rs485):
         if (time.time() - self.tick) < conf().KOCOM_INTERVAL / 1000:
             return
         if cmd == Command.STATUS:
-            logger().info('[To {}]{}/{}/{} -> {}'.format(self._name, device, room, target, value))
+            logger().debug('[To {}]{}/{}/{} -> {}'.format(self._name, device, room, target, value))
         elif cmd == Command.QUERY:
-            logger().info('[To {}]{}/{} -> {}'.format(self._name, device, room, Command.QUERY))
+            logger().debug('[To {}]{}/{} -> {}'.format(self._name, device, room, Command.QUERY))
 
         # TODO: MASTER_LIGHT 으로의 명령이 온다면, Status 를 받은것처럼 처리해야함.
         # STATUS 가 오면, value 를 그대로 사용.
@@ -746,14 +746,12 @@ class Kocom(rs485):
         if device == Device.LIGHT and room == Room.MASTER_LIGHT:
             if cmd == Command.STATUS:
                 v = self.make_master_light_value(value)
-                logger().info('send back to homeassistant device, room, value = {}, {}, {}'.format(device, room, v))
+                logger().debug('send back to homeassistant device, room, value = {}, {}, {}'.format(device, room, v))
                 self.send_to_homeassistant(device, room, v)
             else:
-                logger().info('send back last status to homeassistant device, room, value = {}, {}, {}'.format(device, room, value))
-                logger().info('device state : {}'.format(self.wp_list[device][room]))
+                logger().debug('send back last status to homeassistant device, room, value = {}, {}, {}'.format(device, room, value))
+                logger().debug('device state : {}'.format(self.wp_list[device][room]))
                 self.send_to_homeassistant(device, room, value)
-
-        logger().info('calling make_packet from set_serial')
 
         packet = self.make_packet(device, room, Command.STATUS, target, value) if cmd == Command.STATUS else  self.make_packet(device, room, Command.QUERY, '', '')
         v = self.value_packet(self.parse_packet(packet))
@@ -774,12 +772,10 @@ class Kocom(rs485):
         p_dst = conf().KOCOM_DEVICE_REV.get(Device.WALLPAD) + conf().KOCOM_ROOM_REV.get(Device.WALLPAD)
         p_cmd = conf().KOCOM_COMMAND_REV.get(cmd)
         p_value = ''
-        writeTrace = False
 
-        logger().info('[make_packet] room, cmd, value = {}, {}, {}'.format(room, cmd, value))
+        logger().debug('[make_packet] room, cmd, value = {}, {}, {}'.format(room, cmd, value))
 
         if str(room) == str(Room.MASTER_LIGHT):
-            logger().info('Generating packet of masterlight started')
             try:
                 # p_header + [p_device + p_room] + [p_dst = WALLPAD 01 00] + p_cmd + p_value
                 p_header = 'aa55309c00'
@@ -789,8 +785,6 @@ class Kocom(rs485):
             except Exception as e:
                 logger().info(str(e))
                 logger().info(str(traceback.format_exc()))
-            writeTrace = True
-            logger().info('Generating packet of masterlight finished')
         else:
             if cmd == Command.QUERY:
                 p_value = '0000000000000000'
@@ -855,8 +849,6 @@ class Kocom(rs485):
             packet = p_header + p_device + p_room + p_dst + p_cmd + p_value
             chk_sum = self.check_sum(packet)[1]
             packet += chk_sum + '0d0d'
-            if writeTrace:
-                logger().info('masterlight_command : ' + packet)
             return packet
         return False
 
@@ -867,7 +859,7 @@ class Kocom(rs485):
         return fan
 
     def parse_switch(self, device, room, value='0000000000000000'):
-        logger().info('device, room : {}, {}'.format(device, room))
+        logger().debug('device, room : {}, {}'.format(device, room))
         switch = {}
         if room == Room.MASTER_LIGHT:
             switch[device + str('1')] = OnOff.ON if value.upper() == 'FFFFFFFFFFFFFFFF' else OnOff.OFF
@@ -880,7 +872,7 @@ class Kocom(rs485):
                 if value[i*2-2:i*2] != '00':
                     on_count += 1
             switch[device + str('0')] = OnOff.ON if on_count > 0 else OnOff.OFF
-        logger().info('device, room, switch : {}, {}, {}'.format(device, room, str(switch)))
+        logger().debug('device, room, switch : {}, {}, {}'.format(device, room, str(switch)))
         return switch
 
     def parse_thermostat(self, value='0000000000000000', init_temp=False):
