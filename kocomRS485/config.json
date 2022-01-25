@@ -1,6 +1,6 @@
 {
   "name": "Kocom Wallpad Controller with RS485 modified by KL",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "slug": "kocom_wallpad_kl",
   "description": "Kocom Wallpad Controller for Homeassistant modified by KL",
   "arch": [
