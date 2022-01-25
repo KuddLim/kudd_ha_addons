@@ -4,7 +4,7 @@ FROM python:3
 ENV LANG C.UTF-8
 
 # Copy data for add-on
-COPY run.sh makeconf.sh *.py /
+COPY run.sh makeconf.sh grex.py kocom.py main.py rs485.py settings.py strings.py utility.py /
 
 # Install requirements for add-on
 RUN apt-get update && apt-get -y install jq vim
