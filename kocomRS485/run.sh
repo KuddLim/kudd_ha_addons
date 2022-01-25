@@ -10,7 +10,7 @@ fi
 
 echo "[Info] listing python files"
 
-for f in *.py echo "Python file $f copied"; done
+for f in *.py; do echo "Python file $f copied"; done
 
 echo "[Info] Run Wallpad Controller"
 cd $SHARE_DIR
