@@ -8,10 +8,12 @@ if [ ! -f $SHARE_DIR/main.py ]; then
 fi
 /makeconf.sh
 
+echo "[Info] listing python files"
+
+for f in *.py echo "Python file $f copied"; done
+
 echo "[Info] Run Wallpad Controller"
 cd $SHARE_DIR
 python3 $SHARE_DIR/main.py
-
-for f in *.py echo "Python file $f copied"; done
 # for dev
 while true; do echo "still live"; sleep 100; done
