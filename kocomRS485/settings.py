@@ -104,6 +104,6 @@ def readConfiguration():
             list_data = json_data[ConfString.KOCOM_ROOM_THERMOSTAT]
             for room in list_data:
                 if room not in conf().KOCOM_ROOM_THERMOSTAT.values():
-                    k = conf().KOCOM_ROOM_THERMOSTATREV.get(room)
+                    k = conf().KOCOM_ROOM_THERMOSTAT_REV.get(room)
                     conf().KOCOM_ROOM_THERMOSTAT.pop(k)
                     conf().KOCOM_ROOM_THERMOSTAT.pop(room)
