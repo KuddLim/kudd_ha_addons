@@ -4,8 +4,10 @@ SHARE_DIR=/share/kocom
 
 if [ ! -f $SHARE_DIR/main.py ]; then
 	mkdir $SHARE_DIR
-	mv /main.py $SHARE_DIR
 fi
+
+cp /*.py $SHARE_DIR
+
 /makeconf.sh
 
 echo "[Info] listing python files"
