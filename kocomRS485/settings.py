@@ -99,11 +99,13 @@ def readConfiguration():
             for room in list_data:
                 if room not in conf().KOCOM_ROOM.values():
                     k = conf().KOCOM_ROOM_REV.get(room)
-                    conf().KOCOM_ROOM.pop(k)
-                    conf().KOCOM_ROOM_REV.pop(room)
+                    if k != None:
+                        conf().KOCOM_ROOM.pop(k)
+                        conf().KOCOM_ROOM_REV.pop(room)
             list_data = json_data[ConfString.KOCOM_ROOM_THERMOSTAT]
             for room in list_data:
                 if room not in conf().KOCOM_ROOM_THERMOSTAT.values():
                     k = conf().KOCOM_ROOM_THERMOSTAT_REV.get(room)
-                    conf().KOCOM_ROOM_THERMOSTAT.pop(k)
-                    conf().KOCOM_ROOM_THERMOSTAT.pop(room)
+                    if k != None:
+                        conf().KOCOM_ROOM_THERMOSTAT.pop(k)
+                        conf().KOCOM_ROOM_THERMOSTAT_REV.pop(room)
