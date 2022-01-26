@@ -612,7 +612,7 @@ class Kocom(rs485):
 
             if v['src_device'] == Device.LIGHT and v['src_room'] == Room.MASTER_LIGHT:
                 # TODO: 여기서도 HA 로 전송필요.KL
-                logger().debug('send parsed value to HA : {}'.format(v['value']))
+                logger().debug('[packet_parsing] send parsed value to HA : {}'.format(v['value']))
                 self.set_list(v['src_device'], Room.MASTER_LIGHT, v['value'])
                 self.send_to_homeassistant(v['src_device'], v['src_room'], v['value'])
             if (v['type'] == SendAck.ACK and v['dst_device'] == Device.WALLPAD) or (v['type'] == SendAck.SEND and v['dst_device'] == Device.ELEVATOR):
@@ -752,6 +752,7 @@ class Kocom(rs485):
                 logger().debug('send back last status to homeassistant device, room, value = {}, {}, {}'.format(device, room, value))
                 logger().debug('device state : {}'.format(self.wp_list[device][room]))
                 self.send_to_homeassistant(device, room, value)
+                return
 
         packet = self.make_packet(device, room, Command.STATUS, target, value) if cmd == Command.STATUS else  self.make_packet(device, room, Command.QUERY, '', '')
         v = self.value_packet(self.parse_packet(packet))
@@ -773,7 +774,7 @@ class Kocom(rs485):
         p_cmd = conf().KOCOM_COMMAND_REV.get(cmd)
         p_value = ''
 
-        logger().debug('[make_packet] room, cmd, value = {}, {}, {}'.format(room, cmd, value))
+        logger().debug('[make_packet] room, cmd, target, value = {}, {}, {}'.format(room, cmd, target, value))
 
         if str(room) == str(Room.MASTER_LIGHT):
             try:
