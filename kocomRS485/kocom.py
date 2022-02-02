@@ -1,6 +1,7 @@
 import traceback
 
 from rs485 import *
+from threading import Lock
 
 # v.1.20
 
@@ -10,6 +11,7 @@ class Kocom(rs485):
         self._name = name
         self.connected = True
         self.d_mqtt = None
+        self.sendMutex = Lock()
 
         self.ha_registry = False
         self.kocom_scan = True
@@ -90,13 +92,20 @@ class Kocom(rs485):
         self.tick = time.time()
         if self.client._connect == False:
             return
+
+        res = 0
         try:
+            self.sendMutex.acquire()
             if self.d_type == 'serial':
-                return self.d_serial.write(bytearray.fromhex((data)))
+                res = self.d_serial.write(bytearray.fromhex((data)))
             elif self.d_type == 'socket':
-                return self.d_serial.send(bytearray.fromhex((data)))
+                res = self.d_serial.send(bytearray.fromhex((data)))
         except:
             logging.info('[Serial Write] Connection Error')
+        finally:
+            self.sendMutex.release()
+
+        return res
 
     def connect_mqtt(self, server, name):
         mqtt_client = mqtt.Client()
