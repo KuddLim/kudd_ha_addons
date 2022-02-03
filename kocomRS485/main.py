@@ -10,7 +10,7 @@ from threading import Thread
 def connection_checker_proc(r):
     while True:
         try:
-            if not r.is_connected():
+            if r.is_connected() == False:
                 logger().info("Serial communication unavailable. Try to reconnect...")
                 if r._type == 'serial':
                     r.reconnect_serial()
