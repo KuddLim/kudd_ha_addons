@@ -1,7 +1,6 @@
 import traceback
 
 from rs485 import *
-from threading import Lock
 
 # v.1.20
 
@@ -11,7 +10,6 @@ class Kocom(rs485):
         self._name = name
         self.connected = True
         self.d_mqtt = None
-        self.sendMutex = Lock()
 
         self.ha_registry = False
         self.kocom_scan = True
@@ -58,7 +56,9 @@ class Kocom(rs485):
             self.d_serial = client._connect[device]
         elif self.d_type == "socket":
             self.d_serial = client._connect
-        self.d_mqtt = self.connect_mqtt(self.client._mqtt, name)
+
+        self.d_mqtt = self.init_mqtt()
+        self.connect_mqtt(self.client._mqtt, name)
 
         self._t1 = threading.Thread(target=self.get_serial, args=(name, packet_len))
         self._t1.start()
@@ -73,61 +73,34 @@ class Kocom(rs485):
             return False
 
     def read(self):
-        if self.client._connect == False:
-            return None
-        try:
-            if self.d_type == 'serial':
-                if self.d_serial.readable():
-                    return self.d_serial.read()
-                else:
-                    return ''
-            elif self.d_type == 'socket':
-                return self.d_serial.recv(1)
-        except:
-            logging.info('[Serial Read] Connection Error')
+        return self.client.read()
 
     def write(self, data):
-        if data == False:
-            return
-        self.tick = time.time()
-        if self.client._connect == False:
-            return
+        return self.client.write(data)
 
-        res = 0
-        try:
-            self.sendMutex.acquire()
-            if self.d_type == 'serial':
-                res = self.d_serial.write(bytearray.fromhex((data)))
-            elif self.d_type == 'socket':
-                res = self.d_serial.send(bytearray.fromhex((data)))
-        except:
-            logging.info('[Serial Write] Connection Error')
-        finally:
-            self.sendMutex.release()
-
-        return res
+    def init_mqtt(self):
+        mqtt_client = mqtt.Client()
+        mqtt_client.on_message = self.on_mqtt_message
+        #mqtt_client.on_publish = self.on_mqtt_publish
+        mqtt_client.on_subscribe = self.on_mqtt_subscribe
+        mqtt_client.on_connect = self.on_mqtt_connect
+        mqtt_client.on_disconnect = self.on_mqtt_disconnect
+        return mqtt_client
 
     def connect_mqtt(self, server, name):
-        mqtt_client = mqtt.Client()
-        mqtt_client.on_message = self.on_message
-        #mqtt_client.on_publish = self.on_publish
-        mqtt_client.on_subscribe = self.on_subscribe
-        mqtt_client.on_connect = self.on_connect
-
         if server['anonymous'] != BooleanStr.TRUE:
             if server['server'] == '' or server['username'] == '' or server['password'] == '':
                 logger().info('{} Please check configuration. Server[{}] ID[{}] PW[{}] Device[{}]'.format(ConfString.MQTT, server['server'], server['username'], server['password'], name))
                 return False
-            mqtt_client.username_pw_set(username=server['username'], password=server['password'])
+            self.d_mqtt.username_pw_set(username=server['username'], password=server['password'])
             logger().debug('{} STATUS. Server[{}] ID[{}] PW[{}] Device[{}]'.format(ConfString.MQTT, server['server'], server['username'], server['password'], name))
         else:
             logger().debug('{} STATUS. Server[{}] Device[{}]'.format(ConfString.MQTT, server['server'], name))
 
-        mqtt_client.connect(server['server'], 1883, 60)
-        mqtt_client.loop_start()
-        return mqtt_client
+        self.d_mqtt.connect(server['server'], 1883, 60)
+        self.d_mqtt.loop_start()
 
-    def on_message(self, client, obj, msg):
+    def on_mqtt_message(self, client, obj, msg):
         _topic = msg.topic.split('/')
         _payload = msg.payload.decode()
 
@@ -172,6 +145,39 @@ class Kocom(rs485):
 
         if self.ha_registry != False and self.ha_registry == msg.topic and self.kocom_scan:
             self.kocom_scan = False
+
+    def on_mqtt_publish(self, client, obj, mid):
+        #logger().info("Publish: {}".format(str(mid)))
+        pass
+
+    def on_mqtt_subscribe(self, client, obj, mid, granted_qos):
+        logger().info("Subscribed: {} {}".format(str(mid),str(granted_qos)))
+
+    def on_mqtt_connect(self, client, userdata, flags, rc):
+        if int(rc) == 0:
+            logger().info("[MQTT] connected OK")
+            self.homeassistant_device_discovery(initial=True)
+        elif int(rc) == 1:
+            logger().info("[MQTT] 1: Connection refused – incorrect protocol version")
+        elif int(rc) == 2:
+            logger().info("[MQTT] 2: Connection refused – invalid client identifier")
+        elif int(rc) == 3:
+            logger().info("[MQTT] 3: Connection refused – server unavailable")
+        elif int(rc) == 4:
+            logger().info("[MQTT] 4: Connection refused – bad username or password")
+        elif int(rc) == 5:
+            logger().info("[MQTT] 5: Connection refused – not authorised")
+        else:
+            logger().info("[MQTT] {} : Connection refused".format(rc))
+
+    def on_mqtt_disconnect(self, client, userdata, rc):
+        # https://www.eclipse.org/paho/index.php?page=clients/python/docs/index.php
+        # These functions implement a threaded interface to the network loop. Calling loop_start() once,
+        # before or after connect*(), runs a thread in the background to call loop() automatically.
+        # This frees up the main thread for other work that may be blocking. This call also handles reconnecting to the broker.
+        # loop_start 호출하면 재접속도 하는듯.
+        if rc != 0:
+            print("Unexpected disconnection.")
 
     def parse_message(self, topic, payload):
         device = topic[1]
@@ -253,29 +259,6 @@ class Kocom(rs485):
                 self.send_to_homeassistant(device, room, ha_payload)
             except:
                 logger().debug('[From HA]Error {} = {}'.format(topic, payload))
-
-    def on_publish(self, client, obj, mid):
-        logger().info("Publish: {}".format(str(mid)))
-
-    def on_subscribe(self, client, obj, mid, granted_qos):
-        logger().info("Subscribed: {} {}".format(str(mid),str(granted_qos)))
-
-    def on_connect(self, client, userdata, flags, rc):
-        if int(rc) == 0:
-            logger().info("[MQTT] connected OK")
-            self.homeassistant_device_discovery(initial=True)
-        elif int(rc) == 1:
-            logger().info("[MQTT] 1: Connection refused – incorrect protocol version")
-        elif int(rc) == 2:
-            logger().info("[MQTT] 2: Connection refused – invalid client identifier")
-        elif int(rc) == 3:
-            logger().info("[MQTT] 3: Connection refused – server unavailable")
-        elif int(rc) == 4:
-            logger().info("[MQTT] 4: Connection refused – bad username or password")
-        elif int(rc) == 5:
-            logger().info("[MQTT] 5: Connection refused – not authorised")
-        else:
-            logger().info("[MQTT] {} : Connection refused".format(rc))
 
     def homeassistant_device_discovery(self, initial=False, remove=False):
         subscribe_list = []

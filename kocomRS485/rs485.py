@@ -30,6 +30,8 @@ class rs485:
         self._device_list = {}
         self._wp_list = {}
         self.type = None
+        self.socketLock = threading.Lock()
+        self.connected = True
 
         if not os.path.exists(configPath()):
             raise "Configuration file not exists"
@@ -68,10 +70,10 @@ class rs485:
             self._con = self.connect_serial(self._port_url)
         elif d_type == 'socket':
             self.type = d_type
-            server = config.get(ConfString.SOCKET, 'server')
-            port = config.get(ConfString.SOCKET, 'port')
+            self.serial_server_address = config.get(ConfString.SOCKET, 'server')
+            self.serial_server_port = config.get(ConfString.SOCKET, 'port')
             self._socket_device = config.get(ConfString.SOCKET_DEVICE, 'device')
-            self._con = self.connect_socket(server, port)
+            self._con = self.connect_socket(self.serial_server_address, self.serial_server_port)
         else:
             logger().info('[CONFIG] SERIAL / SOCKET IS NOT VALID')
             logger().info('[CONFIG] EXIT RS485')
@@ -120,6 +122,9 @@ class rs485:
     def _mqtt(self):
         return self._mqtt_config
 
+    def reconnect_serial(self):
+        return self.connect_serial(self._port_url)
+
     def connect_serial(self, port):
         ser = {}
         opened = 0
@@ -133,11 +138,14 @@ class rs485:
                     logger().info('Port {} : {}'.format(p, port[p]))
                     opened += 1
                 else:
-                    logger().info('시리얼포트가 열려있지 않습니다.[{}]'.format(port[p]))
+                    logger().info('Failed to open serial port.[{}]'.format(port[p]))
             except serial.serialutil.SerialException:
-                logger().info('시리얼포트에 연결할 수 없습니다.[{}]'.format(port[p]))
+                logger().info('Failed to open serial port.[{}]'.format(port[p]))
         if opened == 0: return False
         return ser
+
+    def reconnect_socket(self):
+        return self.connect_socket(self.serial_server_address, self.serial_server_port)
 
     def connect_socket(self, server, port):
         soc = socket.socket()
@@ -145,8 +153,86 @@ class rs485:
         try:
             soc.connect((server, int(port)))
         except Exception as e:
-            logger().info('소켓에 연결할 수 없습니다.[{}][{}:{}]'.format(e, server, port))
+            logger().info('Connection via socket failed.[{}][{}:{}]'.format(e, server, port))
+            self.socketLock.acquire()
+            self.connected = False
+            self.socketLock.release()
             return False
         soc.settimeout(None)
+
+        self.socketLock.acquire()
+        self.connected = True
+        self.socketLock.release()
+
         return soc
 
+    def read(self):
+        connected = False
+
+        self.socketLock.acquire()
+        connected = self.connected
+        self.socketLock.release()
+
+        if self._connect == False or not connected:
+            return None
+
+        fail = False
+        if self.type == 'serial':
+            if self._con.readable():
+                ret = self._con.read()
+            else:
+                ret = None
+            # TODO: serial 통신 fail 조건.
+            return ret
+        elif self.type == 'socket':
+            # TODO: 여러 바이트 읽도록 변경 필요. (코콤 시리얼 통신의 경우 메시지가 21바이트 고정길이이다)
+            ret =  self._con.recv(1)
+            if ret == b'':
+                fail = True
+
+        if fail:
+            self.socketLock.acquire()
+            self.connected = False
+            self.socketLock.release()
+            return None
+        else:
+            return ret
+
+    def write(self, data):
+        if data == False:
+            return
+
+        connected = False
+
+        self.socketLock.acquire()
+        connected = self.connected
+        self.socketLock.release()
+
+        self.tick = time.time()
+        if self._con == False or not connected:
+            return
+
+        self.socketLock.acquire()
+
+        res = 0
+        try:
+            if self.d_type == 'serial':
+                res = self.d_serial.write(bytearray.fromhex((data)))
+            elif self.d_type == 'socket':
+                res = self.d_serial.send(bytearray.fromhex((data)))
+        except:
+            logging.info('[Serial Write] Connection Error')
+
+        # TODO: serial 통신일때 조건이 무엇인지.
+        if res == 0:
+            self.connected = False
+
+        self.socketLock.release()
+
+    def is_connected(self):
+        connected = False
+        self.socketLock.acquire()
+        connected = self.connected
+        self.socketLock.release()
+
+        return connected
