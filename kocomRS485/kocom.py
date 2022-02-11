@@ -196,7 +196,7 @@ class Kocom(rs485):
             room = room_device[0]
             sub_device = ''
             if len(room_device) > 1:
-            sub_device = room_device[1]
+                sub_device = room_device[1]
 
             if device == HAStrings.LIGHT:
                 device = Device.LIGHT
