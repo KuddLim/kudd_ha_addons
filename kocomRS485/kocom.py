@@ -48,17 +48,17 @@ class Kocom(rs485):
                     if d_name == Device.LIGHT:
                         keys = conf().KOCOM_LIGHT_SIZE.keys()
                         if r_name in keys:
-                        cnt = conf().KOCOM_LIGHT_SIZE[r_name]
-                        if cnt != 0:
-                            for i in range(0, cnt + 1):
-                                self.wp_list[d_name][r_name][d_name + str(i)] = {'state': OnOff.OFF, 'set': OnOff.OFF, 'last': 'state', 'count': 0}
+                            cnt = conf().KOCOM_LIGHT_SIZE[r_name]
+                            if cnt != 0:
+                                for i in range(0, cnt + 1):
+                                    self.wp_list[d_name][r_name][d_name + str(i)] = {'state': OnOff.OFF, 'set': OnOff.OFF, 'last': 'state', 'count': 0}
                     if d_name == Device.PLUG:
                         keys = conf().KOCOM_PLUG_SIZE.keys()
                         if r_name in keys:
-                        cnt = conf().KOCOM_PLUG_SIZE[r_name]
-                        if cnt != 0:
-                            for i in range(0, cnt + 1):
-                                self.wp_list[d_name][r_name][d_name + str(i)] = {'state': OnOff.ON, 'set': OnOff.ON, 'last': 'state', 'count': 0}
+                            cnt = conf().KOCOM_PLUG_SIZE[r_name]
+                            if cnt != 0:
+                                for i in range(0, cnt + 1):
+                                    self.wp_list[d_name][r_name][d_name + str(i)] = {'state': OnOff.ON, 'set': OnOff.ON, 'last': 'state', 'count': 0}
 
         self.d_type = client._type
         if self.d_type == "serial":
