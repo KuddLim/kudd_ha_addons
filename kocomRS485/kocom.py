@@ -23,6 +23,7 @@ class Kocom(rs485):
         self.wp_gas = self.client._wp_gas
         self.wp_elevator = self.client._wp_elevator
         self.wp_thermostat = self.client._wp_thermostat
+
         for d_name in conf().KOCOM_DEVICE.values():
             if d_name == Device.ELEVATOR or d_name == Device.GAS:
                 self.wp_list[d_name] = {}
@@ -45,11 +46,19 @@ class Kocom(rs485):
                 for r_name in conf().KOCOM_ROOM.values():
                     self.wp_list[d_name][r_name] = {'scan': {'tick': 0, 'count': 0, 'last': 0}}
                     if d_name == Device.LIGHT:
-                        for i in range(0, conf().KOCOM_LIGHT_SIZE[r_name] + 1):
-                            self.wp_list[d_name][r_name][d_name + str(i)] = {'state': OnOff.OFF, 'set': OnOff.OFF, 'last': 'state', 'count': 0}
+                        keys = conf().KOCOM_LIGHT_SIZE.keys()
+                        if r_name in keys:
+                        cnt = conf().KOCOM_LIGHT_SIZE[r_name]
+                        if cnt != 0:
+                            for i in range(0, cnt + 1):
+                                self.wp_list[d_name][r_name][d_name + str(i)] = {'state': OnOff.OFF, 'set': OnOff.OFF, 'last': 'state', 'count': 0}
                     if d_name == Device.PLUG:
-                        for i in range(0, conf().KOCOM_PLUG_SIZE[r_name] + 1):
-                            self.wp_list[d_name][r_name][d_name + str(i)] = {'state': OnOff.ON, 'set': OnOff.ON, 'last': 'state', 'count': 0}
+                        keys = conf().KOCOM_PLUG_SIZE.keys()
+                        if r_name in keys:
+                        cnt = conf().KOCOM_PLUG_SIZE[r_name]
+                        if cnt != 0:
+                            for i in range(0, cnt + 1):
+                                self.wp_list[d_name][r_name][d_name + str(i)] = {'state': OnOff.ON, 'set': OnOff.ON, 'last': 'state', 'count': 0}
 
         self.d_type = client._type
         if self.d_type == "serial":
@@ -185,8 +194,11 @@ class Kocom(rs485):
         if device == HAStrings.LIGHT or device == HAStrings.SWITCH:
             room_device = topic[2].split('_')
             room = room_device[0]
+            sub_device = ''
+            if len(room_device) > 1:
             sub_device = room_device[1]
-            if sub_device.find(Device.LIGHT) != -1:
+
+            if device == HAStrings.LIGHT:
                 device = Device.LIGHT
             if sub_device.find(Device.PLUG) != -1:
                 device = Device.PLUG
@@ -194,6 +206,7 @@ class Kocom(rs485):
                 device = Device.ELEVATOR
             if sub_device.find(Device.GAS) != -1:
                 device = Device.GAS
+
             try:
                 if device == Device.GAS:
                     if payload == OnOff.ON:
@@ -210,6 +223,18 @@ class Kocom(rs485):
                     else:
                         self.wp_list[device][room][sub_device][command] = payload
                         self.wp_list[device][room][sub_device]['last'] = command
+                elif device == Device.LIGHT:
+                    typ = type(payload).__name__
+                    if typ == 'dict':
+                        keys = self.wp_list[device][room].keys()
+                        for k, v in payload:
+                            if k in keys:
+                                self.wp_list[device][room][k][command] = v
+                                self.wp_list[device][room][k]['last'] = command
+                    elif typ == 'str' and sub_device != '':
+                        self.wp_list[device][room][sub_device][command] = payload
+                        self.wp_list[device][room][sub_device]['last'] = command
+
                 else:
                     self.wp_list[device][room][sub_device][command] = payload
                     self.wp_list[device][room][sub_device]['last'] = command
@@ -604,6 +629,7 @@ class Kocom(rs485):
 
             if v['src_device'] == Device.LIGHT and v['src_room'] == Room.MASTER_LIGHT:
                 # TODO: 여기서도 HA 로 전송필요.KL
+                # dictionary 와 string 으로 혼용되어 전송되는 것 같다.
                 logger().debug('[packet_parsing] send parsed value to HA : {}'.format(v['value']))
                 self.set_list(v['src_device'], Room.MASTER_LIGHT, v['value'])
                 self.send_to_homeassistant(v['src_device'], v['src_room'], v['value'])
@@ -625,10 +651,12 @@ class Kocom(rs485):
     def set_list(self, device, room, value, name='kocom'):
         try:
             logger().debug('[From {}]{}/{}/state = {}'.format(name, device, room, value))
+            #TODO: 공통코드. master_light 도 포함되는지 확인필요.
             if 'scan' in self.wp_list[device][room] and type(self.wp_list[device][room]['scan']) == dict:
                 self.wp_list[device][room]['scan']['tick'] = time.time()
                 self.wp_list[device][room]['scan']['count'] = 0
                 self.wp_list[device][room]['scan']['last'] = 0
+
             if device == Device.GAS or device == Device.ELEVATOR:
                 self.wp_list[device][room][device]['state'] = value
                 self.wp_list[device][room][device]['last'] = 'state'
@@ -743,7 +771,8 @@ class Kocom(rs485):
             else:
                 logger().debug('send back last status to homeassistant device, room, value = {}, {}, {}'.format(device, room, value))
                 logger().debug('device state : {}'.format(self.wp_list[device][room]))
-                self.send_to_homeassistant(device, room, value)
+                #self.send_to_homeassistant(device, room, value)
+                self.send_to_homeassistant(device, room, self.wp_list[device][room])
                 return
 
         packet = self.make_packet(device, room, Command.STATUS, target, value) if cmd == Command.STATUS else  self.make_packet(device, room, Command.QUERY, '', '')
