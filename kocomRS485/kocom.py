@@ -44,6 +44,7 @@ class Kocom(rs485):
             elif d_name == Device.LIGHT or d_name == Device.PLUG:
                 self.wp_list[d_name] = {}
                 for r_name in conf().KOCOM_ROOM.values():
+                    logger().info('__init__ device, room = {}, {}'.format(d_name, r_name))
                     self.wp_list[d_name][r_name] = {'scan': {'tick': 0, 'count': 0, 'last': 0}}
                     if d_name == Device.LIGHT:
                         keys = conf().KOCOM_LIGHT_SIZE.keys()
@@ -420,6 +421,7 @@ class Kocom(rs485):
                             subscribe_list.append((ha_payload['cmd_t'], 0))
                             #subscribe_list.append((ha_payload['stat_t'], 0))
                             if remove:
+                                logger().info('remove room {}, rvalue = {}'.format(room, str(r_value)))
                                 publish_list.append({ha_topic : ''})
                             else:
                                 publish_list.append({ha_topic : json.dumps(ha_payload)})
@@ -503,7 +505,8 @@ class Kocom(rs485):
         v_value = json.dumps(value)
         if device == Device.LIGHT:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.LIGHT, room), v_value)
-            logger().debug("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.LIGHT, room, v_value))
+            if room != Room.MASTER_LIGHT:
+                logger().info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.LIGHT, room, v_value))
         elif device == Device.PLUG:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.SWITCH, room), v_value)
             logger().debug("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, v_value))
@@ -589,7 +592,7 @@ class Kocom(rs485):
     def value_packet(self, p):
         v = {}
         if not p:
-            logger().debug('trying to parse empty data')
+            logger().info('trying to parse empty data')
             return False
         try:
             v['type'] = conf().KOCOM_TYPE.get(p['type'])
@@ -619,30 +622,45 @@ class Kocom(rs485):
         p = self.parse_packet(packet)
         v = self.value_packet(p)
 
-        try:
-            if v['command'] == Command.QUERY and v['src_device'] == Device.WALLPAD:
-                if name == 'HA':
-                    self.write(self.make_packet(v['dst_device'], v['dst_room'], Command.QUERY, '', ''))
-                logger().debug('[{} {}]{}({}) {}({}) -> {}({})'.format(from_to, name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room']))
-            else:
-                logger().debug('[{} {}]{}({}) {}({}) -> {}({}) = {}'.format(from_to, name, v['type'], v['command'], v['src_device'], v['src_room'], v['dst_device'], v['dst_room'], v['value']))
+        pType = v['type']
+        pCommand = v['command']
+        pDstDev = v['dst_device']
+        pDstRoom = v['dst_room']
+        pSrcDev = v['src_device']
+        pSrcRoom = v['src_room']
+        pValue = v['value']
 
-            if v['src_device'] == Device.LIGHT and v['src_room'] == Room.MASTER_LIGHT:
+        if type(v) == bool and v == False:
+            return
+
+        try:
+            if pCommand == Command.QUERY and pSrcDev == Device.WALLPAD:
+                if name == 'HA':
+                    self.write(self.make_packet(pDstDev, pDstRoom, Command.QUERY, '', ''))
+                logger().debug('[{} {}]{}({}) {}({}) -> {}({})'.format(from_to, name, pType, pCommand, pSrcDev, pSrcRoom, pDstDev, pDstRoom))
+            else:
+                logger().debug('[{} {}]{}({}) {}({}) -> {}({}) = {}'.format(from_to, name, pType, pCommand, pSrcDev, pSrcRoom, pDstDev, pDstRoom, pValue))
+
+            if pSrcDev == Device.LIGHT and pSrcRoom== Room.MASTER_LIGHT:
                 # TODO: 여기서도 HA 로 전송필요.KL
                 # dictionary 와 string 으로 혼용되어 전송되는 것 같다.
-                logger().debug('[packet_parsing] send parsed value to HA : {}'.format(v['value']))
-                self.set_list(v['src_device'], Room.MASTER_LIGHT, v['value'])
-                self.send_to_homeassistant(v['src_device'], v['src_room'], v['value'])
-            if (v['type'] == SendAck.ACK and v['dst_device'] == Device.WALLPAD) or (v['type'] == SendAck.SEND and v['dst_device'] == Device.ELEVATOR):
-                if v['type'] == SendAck.SEND and v['dst_device'] == Device.ELEVATOR:
-                    self.set_list(v['dst_device'], Device.WALLPAD, v['value'])
-                    self.send_to_homeassistant(v['dst_device'], Device.WALLPAD, v['value'])
-                elif v['src_device'] == Device.FAN or v['src_device'] == Device.GAS:
-                    self.set_list(v['src_device'], Device.WALLPAD, v['value'])
-                    self.send_to_homeassistant(v['src_device'], Device.WALLPAD, v['value'])
-                elif v['src_device'] == Device.THERMOSTAT or v['src_device'] == Device.LIGHT or v['src_device'] == Device.PLUG:
-                    self.set_list(v['src_device'], v['src_room'], v['value'])
-                    self.send_to_homeassistant(v['src_device'], v['src_room'], v['value'])
+                logger().debug('[packet_parsing] send parsed value to HA : {}'.format(pValue))
+                self.set_list(pSrcDev, Room.MASTER_LIGHT, pValue)
+                self.send_to_homeassistant(pSrcDev, pSrcRoom, pValue)
+
+            if (pType == SendAck.ACK and pDstDev == Device.WALLPAD) or (pType == SendAck.SEND and pDstDev == Device.ELEVATOR):
+                if pType == SendAck.SEND and pDstDev == Device.ELEVATOR:
+                    self.set_list(pDstDev, Device.WALLPAD, pValue)
+                    self.send_to_homeassistant(pDstDev, Device.WALLPAD, pValue)
+                elif pSrcDev == Device.FAN or pSrcDev == Device.GAS:
+                    self.set_list(pSrcDev, Device.WALLPAD, pValue)
+                    self.send_to_homeassistant(pSrcDev, Device.WALLPAD, pValue)
+                elif pSrcDev == Device.THERMOSTAT or pSrcDev == Device.LIGHT or pSrcDev == Device.PLUG:
+                    self.set_list(pSrcDev, pSrcRoom, pValue)
+                    if pSrcDev == Device.LIGHT:
+                        self.send_to_homeassistant(pSrcDev, pSrcRoom, (pValue | self.wp_list[pSrcDev][pSrcRoom]))  # FIXME: 추가로 scan 된 것도.
+                    else:
+                        self.send_to_homeassistant(pSrcDev, pSrcRoom, pValue)
         except Exception as e:
             logger().info(str(e))
             logger().info(str(traceback.format_exc()))
@@ -709,10 +727,15 @@ class Kocom(rs485):
                 if now - self.tick > conf().KOCOM_INTERVAL / 1000:
                     try:
                         for device, d_list in self.wp_list.items():
-                            if type(d_list) == dict and ((device == Device.ELEVATOR and self.wp_elevator) or (device == Device.FAN and self.wp_fan) or (device == Device.GAS and self.wp_gas) or (device == Device.LIGHT and self.wp_light) or (device == Device.PLUG and self.wp_plug) or (device == Device.THERMOSTAT and self.wp_thermostat)):
+                            devInUse = ((device == Device.FAN and self.wp_fan) or (device == Device.GAS and self.wp_gas) or \
+                                        (device == Device.LIGHT and self.wp_light) or (device == Device.PLUG and self.wp_plug) or \
+                                        (device == Device.THERMOSTAT and self.wp_thermostat))
+                            elvInUse = (device == Device.ELEVATOR and self.wp_elevator)
+
+                            if type(d_list) == dict and (devInUse or elvInUse):
                                 for room, r_list in d_list.items():
                                     if type(r_list) == dict:
-                                        if 'scan' in r_list and type(r_list['scan']) == dict and now - r_list['scan']['tick'] > conf().SCAN_INTERVAL and ((device == Device.FAN and self.wp_fan) or (device == Device.GAS and self.wp_gas) or (device == Device.LIGHT and self.wp_light) or (device == Device.PLUG and self.wp_plug) or (device == Device.THERMOSTAT and self.wp_thermostat)):
+                                        if 'scan' in r_list and type(r_list['scan']) == dict and now - r_list['scan']['tick'] > conf().SCAN_INTERVAL and devInUse:
                                             if now - r_list['scan']['last'] > 2:
                                                 r_list['scan']['count'] += 1
                                                 r_list['scan']['last'] = now
@@ -763,17 +786,23 @@ class Kocom(rs485):
         # STATUS 가 오면, value 를 그대로 사용.
         # QUERY 가 오면, 마지막 상태를 전송.
         # homeassistant 로 전송을 해야하나???
-        if device == Device.LIGHT and room == Room.MASTER_LIGHT:
-            if cmd == Command.STATUS:
-                v = self.make_master_light_value(value)
-                logger().debug('send back to homeassistant device, room, value = {}, {}, {}'.format(device, room, v))
-                self.send_to_homeassistant(device, room, v)
+        if device == Device.LIGHT:
+            if room == Room.MASTER_LIGHT:
+                if cmd == Command.STATUS:
+                    v = self.make_master_light_value(value)
+                    logger().debug('send back to homeassistant device, room, value = {}, {}, {}'.format(device, room, v))
+                    self.send_to_homeassistant(device, room, v)
+                else:
+                    logger().debug('send back last status to homeassistant device, room, value = {}, {}, {}'.format(device, room, value))
+                    logger().debug('device state : {}'.format(self.wp_list[device][room]))
+                    #self.send_to_homeassistant(device, room, value)
+                    self.send_to_homeassistant(device, room, self.wp_list[device][room])
+                    return
             else:
-                logger().debug('send back last status to homeassistant device, room, value = {}, {}, {}'.format(device, room, value))
-                logger().debug('device state : {}'.format(self.wp_list[device][room]))
-                #self.send_to_homeassistant(device, room, value)
-                self.send_to_homeassistant(device, room, self.wp_list[device][room])
-                return
+                if cmd == Command.STATUS:
+                    self.send_to_homeassistant(device, room, v)
+                else:
+                    self.send_to_homeassistant(device, room, self.wp_list[device][room])
 
         packet = self.make_packet(device, room, Command.STATUS, target, value) if cmd == Command.STATUS else  self.make_packet(device, room, Command.QUERY, '', '')
         v = self.value_packet(self.parse_packet(packet))
