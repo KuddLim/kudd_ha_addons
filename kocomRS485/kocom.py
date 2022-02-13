@@ -505,8 +505,7 @@ class Kocom(rs485):
         v_value = json.dumps(value)
         if device == Device.LIGHT:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.LIGHT, room), v_value)
-            if room != Room.MASTER_LIGHT:
-                logger().info("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.LIGHT, room, v_value))
+            logger().debug("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.LIGHT, room, v_value))
         elif device == Device.PLUG:
             self.d_mqtt.publish("{}/{}/{}/state".format(HAStrings.PREFIX, HAStrings.SWITCH, room), v_value)
             logger().debug("[To HA]{}/{}/{}/state = {}".format(HAStrings.PREFIX, HAStrings.SWITCH, room, v_value))
@@ -592,7 +591,7 @@ class Kocom(rs485):
     def value_packet(self, p):
         v = {}
         if not p:
-            logger().info('trying to parse empty data')
+            logger().debug('trying to parse empty data')
             return False
         try:
             v['type'] = conf().KOCOM_TYPE.get(p['type'])
@@ -622,6 +621,9 @@ class Kocom(rs485):
         p = self.parse_packet(packet)
         v = self.value_packet(p)
 
+        if type(v) == bool and v == False:
+            return
+
         pType = v['type']
         pCommand = v['command']
         pDstDev = v['dst_device']
@@ -629,9 +631,6 @@ class Kocom(rs485):
         pSrcDev = v['src_device']
         pSrcRoom = v['src_room']
         pValue = v['value']
-
-        if type(v) == bool and v == False:
-            return
 
         try:
             if pCommand == Command.QUERY and pSrcDev == Device.WALLPAD:
@@ -657,10 +656,13 @@ class Kocom(rs485):
                     self.send_to_homeassistant(pSrcDev, Device.WALLPAD, pValue)
                 elif pSrcDev == Device.THERMOSTAT or pSrcDev == Device.LIGHT or pSrcDev == Device.PLUG:
                     self.set_list(pSrcDev, pSrcRoom, pValue)
-                    if pSrcDev == Device.LIGHT:
-                        self.send_to_homeassistant(pSrcDev, pSrcRoom, (pValue | self.wp_list[pSrcDev][pSrcRoom]))  # FIXME: 추가로 scan 된 것도.
-                    else:
-                        self.send_to_homeassistant(pSrcDev, pSrcRoom, pValue)
+                    # 에러 로그수정(scan 도 전달되도록)을 위해 아래처럼 하면 동작하지 않음.
+                    #if pSrcDev == Device.LIGHT:
+                    #    self.send_to_homeassistant(pSrcDev, pSrcRoom, (pValue | self.wp_list[pSrcDev][pSrcRoom]))  # FIXME: 추가로 scan 된 것도.
+                    #else:
+                    #    self.send_to_homeassistant(pSrcDev, pSrcRoom, pValue)
+                    # 임시로 아래와 같이 (원래 동작)
+                    self.send_to_homeassistant(pSrcDev, pSrcRoom, pValue)
         except Exception as e:
             logger().info(str(e))
             logger().info(str(traceback.format_exc()))
@@ -798,11 +800,12 @@ class Kocom(rs485):
                     #self.send_to_homeassistant(device, room, value)
                     self.send_to_homeassistant(device, room, self.wp_list[device][room])
                     return
-            else:
-                if cmd == Command.STATUS:
-                    self.send_to_homeassistant(device, room, v)
-                else:
-                    self.send_to_homeassistant(device, room, self.wp_list[device][room])
+            # 에러 로그 수정(scan 도 전달) 을 위해 아래처럼 하면, 동작하지 않음.
+            #else:
+            #    if cmd == Command.STATUS:
+            #        self.send_to_homeassistant(device, room, v)
+            #    else:
+            #        self.send_to_homeassistant(device, room, self.wp_list[device][room])
 
         packet = self.make_packet(device, room, Command.STATUS, target, value) if cmd == Command.STATUS else  self.make_packet(device, room, Command.QUERY, '', '')
         v = self.value_packet(self.parse_packet(packet))
